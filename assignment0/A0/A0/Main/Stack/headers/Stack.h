@@ -11,12 +11,27 @@ class Node {
 private:
 
 	Data holdMe;
-	Node *next;
+	Node<Data>* next;
 	
 public:
 
-	Node(Data data, Node* ptr):holdMe(data), next(ptr) {}
+	Node(Data data, Node<Data>* ptr):holdMe(data), next(ptr) {}
 
+	Data getData() {
+		return holdMe;
+	}
+
+	void setData(Data data) {
+		holdMe = data;
+	}
+
+	Node<Data>* getNext() {
+		return next;
+	}
+
+	void setNext(Node<Data>* ptr) {
+		next = ptr;
+	}
 };
 
 // a simple LIFO stack
@@ -29,10 +44,10 @@ public:
 
 	// destroys the stack
 	~Stack () {
-		Node* tmp;
+		Node<Data>* tmp;
 
-		while (!head) {
-			tmp = head->next;
+		while (head) {
+			tmp = head->getNext();
 			delete head;
 			head = tmp;
 		}
@@ -45,12 +60,12 @@ public:
 
 	// adds pushMe to the top of the stack
 	void push (Data pushMe) { 
-		Node* tmp = new Node(pushMe, head);
+		Node<Data>* tmp = new Node<Data>(pushMe, head);
 		head = tmp;
 	}
 
 	// return true if there are not any items in the stack
-	bool isEmpty () { 
+	bool isEmpty () {
 		return !head; 
 	}
 
@@ -58,12 +73,12 @@ public:
 	// if the stack is empty, the behavior is undefined
 	Data pop () {
 		if (isEmpty()) {
-			std::cout << "Error in pop(): the stack is empty!" << endl;
+			std::cout << "Error in pop(): the stack is empty!" << std::endl;
 		}
 
-		Node* tmp = head;
-		Data result = tmp->holdMe;
-		head = head->next;
+		Node<Data>* tmp = head;
+		Data result = tmp->getData();
+		head = head->getNext();
 		delete tmp;
 
 		return result;

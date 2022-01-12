@@ -14,7 +14,7 @@ int main () {
 	// UNIT TEST 1
 	// just make sure we can create an empty stack, and that it is empty
 	{
-		
+
 		Stack <int> myStack;
 		QUNIT_IS_EQUAL (myStack.isEmpty (), true);
 
