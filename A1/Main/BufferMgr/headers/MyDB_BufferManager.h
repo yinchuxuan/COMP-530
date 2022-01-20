@@ -7,6 +7,34 @@
 
 using namespace std;
 
+// Page node's status
+// EMPTY: 				This page is not used
+// NORMAL:				This page is used as normal page
+// ANONYMOUS:			This page is used as anonymous page
+// NORMAL_PINNNED:		This page is used as normal page and is pinned
+// ANONYMOUS_PINNED: 	This page is user as anonymous page and is pinned 
+enum Status {
+	EMPTY,
+	NORMAL,
+	ANONYMOUS,
+	NORMAL_PINNED,
+	ANONYMOUS_PINNED
+};
+
+// Page node's definition
+// This supports a double linked list structure
+struct MyDB_PageNode {
+	MyDB_TablePtr table;
+	long index;
+	Status status;
+	bool isWritten;
+	char* pageBuffer;
+	MyDB_PageNode* prev;
+	MyDB_PageNode* next;
+
+	MyDB_PageNode():status(EMPTY), isWritten(false) {} 
+};
+
 class MyDB_BufferManager {
 
 public:
