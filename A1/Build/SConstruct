@@ -33,7 +33,7 @@ What do you want to build/clean?\n
 2. Buffer unit tests for Clear (use clang++ compiler)
 """)
 
-ans=raw_input("Select the module(s) you want to build or clean. ")
+ans=input("Select the module(s) you want to build or clean. ")
 
 if ans=="1":
 	print("\nOK, building buffer unit tests.")

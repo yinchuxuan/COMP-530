@@ -4,35 +4,68 @@
 
 #include "MyDB_PageHandle.h"
 #include "MyDB_Table.h"
+#include "MyDB_PageIndexUtil.h"
+#include "MyDB_FileIO.h"
+#include <unordered_map>
+#include <stack>
+#include <iostream>
 
 using namespace std;
 
-// Page node's status
-// EMPTY: 				This page is not used
-// NORMAL:				This page is used as normal page
-// ANONYMOUS:			This page is used as anonymous page
-// NORMAL_PINNNED:		This page is used as normal page and is pinned
-// ANONYMOUS_PINNED: 	This page is user as anonymous page and is pinned 
-enum Status {
+class MyDB_PageHandleBase;
+typedef shared_ptr <MyDB_PageHandleBase> MyDB_PageHandle;
+
+// Buffer's status
+// EMPTY: 				This buffer is not used
+// UNPINNED:			This buffer is not pinned 
+// PINNED:				This buffer is pinned in memory
+enum MyDB_BufferStatus {
 	EMPTY,
-	NORMAL,
-	ANONYMOUS,
-	NORMAL_PINNED,
-	ANONYMOUS_PINNED
+	UNPINNED,
+	PINNED
 };
 
-// Page node's definition
-// This supports a double linked list structure
-struct MyDB_PageNode {
+// Page Type
+// NORMAL:				This page is used by user
+// ANONYMOUS:			This page is used as temporary page
+enum MyDB_PageType {
+	NORMAL,
+	ANONYMOUS
+};
+
+struct MyDB_Page;
+
+// Buffer node's definition
+// This supports a double linked structure
+struct MyDB_BufferNode {
+	char* buffer;
+	MyDB_BufferNode* prev;
+	MyDB_BufferNode* next;
+	MyDB_Page* page;
+	MyDB_BufferStatus status;
+
+	MyDB_BufferNode(size_t pageSize):status(EMPTY) {
+		buffer = static_cast<char*>(malloc(pageSize));
+	}
+
+	~MyDB_BufferNode() {
+		free(static_cast<char*>(buffer));
+	}
+};
+
+// Page's definition
+struct MyDB_Page {
 	MyDB_TablePtr table;
 	long index;
-	Status status;
+	MyDB_PageType type;
 	bool isWritten;
-	char* pageBuffer;
-	MyDB_PageNode* prev;
-	MyDB_PageNode* next;
+	int handleRefrence;
+	MyDB_BufferNode* bufferNode;
 
-	MyDB_PageNode():status(EMPTY), isWritten(false) {} 
+	MyDB_Page(MyDB_TablePtr tbl, long i, MyDB_PageType pageType):table(tbl), index(i), type(pageType), isWritten(false), handleRefrence(0), bufferNode(nullptr) {}
+
+	MyDB_Page(long i, MyDB_PageType pageType):table(nullptr), index(i), type(pageType), isWritten(false), handleRefrence(0), bufferNode(nullptr) {}
+
 };
 
 class MyDB_BufferManager {
@@ -79,8 +112,37 @@ public:
 
 private:
 
-	// YOUR STUFF HERE
+	unordered_map<MyDB_PageKey, MyDB_Page*> pageHashMap;
 
+	stack<MyDB_BufferNode*> emptyBufferNodes;
+	
+	MyDB_BufferNode* bufferListHead;
+	
+	MyDB_BufferNode* bufferListTail;
+
+	size_t pageSize;
+
+	size_t numPages;
+
+	string tempFile;
+
+	long anonymous_index;
+
+	void* getBuffer(MyDB_PageKey pageKey);
+
+	void writeBuffer(MyDB_PageKey pageKey);
+
+	void decreaseReference(MyDB_PageKey pageKey);
+
+	void pinBufferNode(MyDB_BufferNode* bufferNode);
+
+	void unpinBufferNode(MyDB_BufferNode* bufferNode);
+
+	void loadPage(MyDB_Page* page);
+
+	void evictPage(MyDB_Page* page);
+
+	friend class MyDB_PageHandleBase;
 };
 
 #endif

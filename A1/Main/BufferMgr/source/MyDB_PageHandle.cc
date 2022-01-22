@@ -6,13 +6,15 @@
 #include "MyDB_PageHandle.h"
 
 void *MyDB_PageHandleBase :: getBytes () {
-	return nullptr;
+	return managerInstance->getBuffer(pageKey);
 }
 
 void MyDB_PageHandleBase :: wroteBytes () {
+	managerInstance->writeBuffer(pageKey);
 }
 
 MyDB_PageHandleBase :: ~MyDB_PageHandleBase () {
+	managerInstance->decreaseReference(pageKey);
 }
 
 #endif

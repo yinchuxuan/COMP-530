@@ -3,13 +3,19 @@
 #define PAGE_HANDLE_H
 
 #include <memory>
+#include "MyDB_Table.h"
+#include "MyDB_PageIndexUtil.h"
+#include "MyDB_BufferManager.h"
 
 // page handles are basically smart pointers
 using namespace std;
 class MyDB_PageHandleBase;
+class MyDB_BufferManager;
 typedef shared_ptr <MyDB_PageHandleBase> MyDB_PageHandle;
 
 class MyDB_PageHandleBase {
+
+friend class MyDB_BufferManager;
 
 public:
 
@@ -33,11 +39,16 @@ public:
 	// become unpinned.  
 	~MyDB_PageHandleBase ();
 
-	// FEEL FREE TO ADD ADDITIONAL PUBLIC METHODS
+	// Initialize page handle base
+	// This method should only be called by MyDB_BufferManager
+	MyDB_PageHandleBase(MyDB_PageKey key, MyDB_BufferManager* manager):pageKey(key), managerInstance(manager) {}
 
 private:
 
-	// YOUR CODE HERE
+	MyDB_PageKey pageKey;
+
+	MyDB_BufferManager* managerInstance;
+
 };
 
 #endif
