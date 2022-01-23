@@ -59,12 +59,12 @@ struct MyDB_Page {
 	long index;
 	MyDB_PageType type;
 	bool isWritten;
-	int handleRefrence;
+	int handleReference;
 	MyDB_BufferNode* bufferNode;
 
-	MyDB_Page(MyDB_TablePtr tbl, long i, MyDB_PageType pageType):table(tbl), index(i), type(pageType), isWritten(false), handleRefrence(0), bufferNode(nullptr) {}
+	MyDB_Page(MyDB_TablePtr tbl, long i, MyDB_PageType pageType):table(tbl), index(i), type(pageType), isWritten(false), handleReference(0), bufferNode(nullptr) {}
 
-	MyDB_Page(long i, MyDB_PageType pageType):table(nullptr), index(i), type(pageType), isWritten(false), handleRefrence(0), bufferNode(nullptr) {}
+	MyDB_Page(long i, MyDB_PageType pageType):table(nullptr), index(i), type(pageType), isWritten(false), handleReference(0), bufferNode(nullptr) {}
 
 };
 

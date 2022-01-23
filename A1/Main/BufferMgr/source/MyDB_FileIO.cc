@@ -17,13 +17,13 @@ size_t readPage(const string filename, const size_t offset, const size_t pageSiz
     }
     int fd;
     int readBytes;
-    fd = open(filename.c_str() , O_RDONLY);
+    fd = open(filename.c_str() , O_RDONLY | O_CREAT, 0666);
     if (fd == -1) {
-        printf("file not exists...");
+        printf("failed to open file...\n");
         return 0;
     }
     if (lseek(fd, offset, SEEK_SET) == -1 ) {
-        printf("read offset error...");
+        printf("read offset error..\n");
         return 0;
     }
     readBytes = read(fd, buffer, pageSize);
@@ -39,13 +39,13 @@ void writePage(const string filename, const size_t offset, const size_t pageSize
         return;
     }
     int fd;
-    fd = open(filename.c_str(), O_CREAT | O_RDWR, 0666);
+    fd = open(filename.c_str(), O_RDWR | O_FSYNC);
     if (fd == -1) {
-        printf("file not exists...");
+        printf("file not exists...\n");
         return;
     }
     if (lseek(fd, offset, SEEK_SET) == -1 ) {
-        printf("read offset error...");
+        printf("read offset error...\n");
         return;
     }
     write(fd, buffer, pageSize);
