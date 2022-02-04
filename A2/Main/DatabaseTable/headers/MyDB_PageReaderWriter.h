@@ -5,6 +5,13 @@
 #include "MyDB_PageType.h"
 #include "MyDB_TableReaderWriter.h"
 
+
+struct MyDB_PageHeader {
+	size_t offSetToPageEnd;
+	MyDB_PageType pageType;
+	char records[0];
+};
+
 class MyDB_PageReaderWriter {
 
 public:
