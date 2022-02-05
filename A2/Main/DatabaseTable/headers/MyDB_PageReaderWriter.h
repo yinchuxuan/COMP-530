@@ -5,7 +5,6 @@
 #include "MyDB_PageType.h"
 #include "MyDB_TableReaderWriter.h"
 
-
 struct MyDB_PageHeader {
 	size_t offSetToPageEnd;
 	MyDB_PageType pageType;
@@ -37,10 +36,21 @@ public:
 
 	// sets the type of the page
 	void setType (MyDB_PageType toMe);
+
+	// Constructor with table name, page index, page size and buffer manager pointer. Get pinned page.
+	MyDB_PageReaderWriter(MyDB_TablePtr tbl, long i, size_t size, MyDB_BufferManagerPtr bufManager) ;
 	
 private:
 
-	// ANYTHING ELSE YOU WANT HERE
+	MyDB_PageHandle pageHandle;	
+
+	MyDB_TablePtr table;
+
+	long index;
+
+	MyDB_BufferManagerPtr bufferManager;
+
+	size_t pageSize;
 };
 
 #endif

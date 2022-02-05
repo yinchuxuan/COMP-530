@@ -50,6 +50,9 @@ public:
 private:
 
 	// ANYTHING YOU NEED HERE
+	MyDB_TablePtr table;
+
+	MyDB_BufferManagerPtr bufferManager;
 };
 
 #endif
