@@ -47,6 +47,9 @@ public:
         // access the last page in the file
     MyDB_PageReaderWriter last ();
 
+    // get last page index
+    int getLast();
+
 private:
 
 	// ANYTHING YOU NEED HERE

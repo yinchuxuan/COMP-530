@@ -8,7 +8,10 @@
 
 
 class MyDB_PageRecIterator: public MyDB_RecordIterator {
-    
+private:
+    MyDB_RecordPtr recordPtr;
+    MyDB_PageHeader* pageHeader;
+    void* startPos;
 public:
 
     // Constructor with rec pointer and page header
@@ -18,6 +21,10 @@ public:
 
     // Get current record object
     MyDB_RecordPtr getRecord();
+
+    bool hasNext() override;
+
+    void getNext() override;
 };
 
 #endif

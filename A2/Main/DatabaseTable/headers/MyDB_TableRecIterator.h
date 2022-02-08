@@ -5,10 +5,15 @@
 #include "MyDB_RecordIterator.h"
 #include "MyDB_PageReaderWriter.h"
 #include "MyDB_Record.h"
+#include "MyDB_PageRecIterator.h"
 
 
 class MyDB_TableRecIterator: public MyDB_RecordIterator {
-    
+private:
+    MyDB_RecordPtr recordPtr;
+    MyDB_TableReaderWriterPtr tableReaderWriter;
+    MyDB_PageRecIterator* pageRecIterator;
+    int index;
 public:
 
     // Constructor with rec pointer and table reader writer pointer 
@@ -18,6 +23,10 @@ public:
 
     // Get current record object
     MyDB_RecordPtr getRecord();
+
+    bool hasNext() override;
+
+    void getNext() override;
 };
 
 #endif

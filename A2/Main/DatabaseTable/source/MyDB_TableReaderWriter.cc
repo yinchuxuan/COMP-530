@@ -98,4 +98,8 @@ void MyDB_TableReaderWriter :: writeIntoTextFile (string text) {
 	textFile.close();
 }
 
+int MyDB_TableReaderWriter::getLast() {
+    return table->lastPage();
+}
+
 #endif
