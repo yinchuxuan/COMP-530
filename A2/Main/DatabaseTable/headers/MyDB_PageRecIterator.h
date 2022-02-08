@@ -11,10 +11,10 @@ class MyDB_PageRecIterator: public MyDB_RecordIterator {
     
 public:
 
-    // Constructor with rec pointer and table reader writer pointer 
-    // Record is an injected object, table reader writer pointer is used to refer
-    // itself
-    MyDB_PageRecIterator(MyDB_RecordPtr rec, MyDB_TableReaderWriterPtr trw);
+    // Constructor with rec pointer and page header
+    // Record is an injected object, page header is used for locating page address
+    // and getting offset to the end
+    MyDB_PageRecIterator(MyDB_RecordPtr rec, struct MyDB_PageHeader* header);
 
     // Get current record object
     MyDB_RecordPtr getRecord();
