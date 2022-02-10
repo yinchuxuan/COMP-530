@@ -14,10 +14,10 @@ MyDB_TableReaderWriter :: MyDB_TableReaderWriter (MyDB_TablePtr tbl, MyDB_Buffer
 }
 
 MyDB_PageReaderWriter MyDB_TableReaderWriter :: operator [] (size_t index) {
-	if (index > table->lastPage()) {	// require uninitialized page, initialize them first
+	if (index > (long)table->lastPage()) {	// require uninitialized page, initialize them first
 		for (int i = table->lastPage() + 1; i <= index; i++) {
 			MyDB_PageReaderWriter rw = MyDB_PageReaderWriter(table, i, bufferManager->getPageSize(), bufferManager);
-			rw.setType(RegularPage);		
+			rw.initializePage();		
 		}
 
 		table->setLastPage(index);
@@ -33,7 +33,7 @@ MyDB_RecordPtr MyDB_TableReaderWriter :: getEmptyRecord () {
 MyDB_PageReaderWriter MyDB_TableReaderWriter :: last () {
 	if (table->lastPage() == -1) {		// this table has never been writen, return the first empty page
 		MyDB_PageReaderWriter rw = MyDB_PageReaderWriter(table, 0, bufferManager->getPageSize(), bufferManager);
-		rw.setType(RegularPage);
+		rw.initializePage();
 		table->setLastPage(0);
 		return rw;
 	}
@@ -50,7 +50,7 @@ void MyDB_TableReaderWriter :: append (MyDB_RecordPtr record) {
 
 	if (!lastPageReaderWriter.append(record)) {		// need to append a new page
 		lastPageReaderWriter = MyDB_PageReaderWriter(table, table->lastPage() + 1, bufferManager->getPageSize(), bufferManager);
-		lastPageReaderWriter.setType(RegularPage);		// append regular page by default 
+		lastPageReaderWriter.initializePage();		// append regular page by default 
 		lastPageReaderWriter.append(record);
 		table->setLastPage(table->lastPage() + 1);		// increment last page's index
 	}
@@ -67,7 +67,7 @@ void MyDB_TableReaderWriter :: loadFromTextFile (string text) {
 		}
 
 		MyDB_RecordPtr tmpRecord = make_shared<MyDB_Record>(table->getSchema());
-		tmpRecord->fromText(recordContent);
+		tmpRecord->fromString(recordContent);
 		append(tmpRecord);
 	}
 
@@ -75,15 +75,15 @@ void MyDB_TableReaderWriter :: loadFromTextFile (string text) {
 }
 
 MyDB_RecordIteratorPtr MyDB_TableReaderWriter :: getIterator (MyDB_RecordPtr record) {
-	return MyDB_TableRecIterator(record, this);
+	return dynamic_pointer_cast<MyDB_RecordIterator>(make_shared<MyDB_TableRecIterator>(record, this));
 }
 
 void MyDB_TableReaderWriter :: writeIntoTextFile (string text) {
-	fstream testFile(text);
-	MyDB_TableRecIterator iterator = dynamic_cast<MyDB_TableRecIterator>(getIterator());
+	fstream textFile(text);
+	shared_ptr<MyDB_TableRecIterator> iterator = dynamic_pointer_cast<MyDB_TableRecIterator>(getIterator(getEmptyRecord()));
 
 	while (1) {
-		MyDB_RecordPtr tmpRecord = iterator.getRecord();
+		MyDB_RecordPtr tmpRecord = iterator->getRecord();
 		char buffer[tmpRecord->getBinarySize()];
 		tmpRecord->toBinary(buffer);
 		textFile << string(buffer) << endl;

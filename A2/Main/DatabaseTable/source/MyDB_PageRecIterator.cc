@@ -4,9 +4,9 @@
 #include "MyDB_PageRecIterator.h"
 
 MyDB_PageRecIterator ::MyDB_PageRecIterator(MyDB_RecordPtr rec, struct MyDB_PageHeader* header) {
-    recordPtr = rec;
+    recordPtr = rec;        // Not initialized yet
     pageHeader = header;
-    startPos = pageHeader->records;
+    startPos = header->records;
 }
 
 MyDB_RecordPtr MyDB_PageRecIterator::getRecord() {
@@ -18,7 +18,7 @@ void MyDB_PageRecIterator::getNext() {
 }
 
 bool MyDB_PageRecIterator::hasNext() {
-    size_t end = pageHeader->offSetToPageEnd;
-    return pageHeader->records + end > startPos;
+    return  (size_t)pageHeader->records + pageHeader->offSetToPageEnd > (size_t)startPos;
 }
+
 #endif

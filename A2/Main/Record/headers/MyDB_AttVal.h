@@ -3,6 +3,7 @@
 #define ATT_VAL_H
 
 #include <memory>
+#include <cstring>
 #include <string>
 
 // create a smart pointer for the catalog

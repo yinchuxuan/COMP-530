@@ -4,6 +4,8 @@
 
 #include "MyDB_PageType.h"
 #include "MyDB_TableReaderWriter.h"
+#include "MyDB_PageRecIterator.h"
+#include <cstring>
 
 struct MyDB_PageHeader {
 	size_t offSetToPageEnd;
@@ -40,6 +42,8 @@ public:
 	// Constructor with table name, page index, page size and buffer manager pointer. Get pinned page.
 	MyDB_PageReaderWriter(MyDB_TablePtr tbl, long i, size_t size, MyDB_BufferManagerPtr bufManager) ;
 	
+	// Initialize one page
+	void initializePage();
 private:
 
 	MyDB_PageHandle pageHandle;	

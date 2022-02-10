@@ -346,6 +346,8 @@ int main(int argc, char *argv[]) {
 				counter++;
 			}
 
+			cout << counter << endl;
+
 			cout << "clear page 33..." << flush;
 			supplierTable[33].clear();
 

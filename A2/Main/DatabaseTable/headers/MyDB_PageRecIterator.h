@@ -6,12 +6,16 @@
 #include "MyDB_PageReaderWriter.h"
 #include "MyDB_Record.h"
 
-
 class MyDB_PageRecIterator: public MyDB_RecordIterator {
+
 private:
+
     MyDB_RecordPtr recordPtr;
-    MyDB_PageHeader* pageHeader;
+
+    struct MyDB_PageHeader* pageHeader;
+
     void* startPos;
+
 public:
 
     // Constructor with rec pointer and page header
