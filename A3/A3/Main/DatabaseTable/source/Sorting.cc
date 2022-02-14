@@ -9,6 +9,7 @@
 #include "Sorting.h"
 #include "RecordComparator.h"
 #include <queue>
+#include "MyDB_PageReaderWriter.h"
 
 using namespace std;
 
@@ -35,8 +36,56 @@ void mergeIntoFile (MyDB_TableReaderWriter &outTable, vector <MyDB_RecordIterato
 	}
 }
 
-vector <MyDB_PageReaderWriter> mergeIntoList (MyDB_BufferManagerPtr, MyDB_RecordIteratorAltPtr, MyDB_RecordIteratorAltPtr, function <bool ()>, 
-	MyDB_RecordPtr, MyDB_RecordPtr) {return vector <MyDB_PageReaderWriter> (); } 
+vector <MyDB_PageReaderWriter> mergeIntoList (MyDB_BufferManagerPtr bufferManager, MyDB_RecordIteratorAltPtr lhs, MyDB_RecordIteratorAltPtr rhs, function <bool ()> comparator,
+	MyDB_RecordPtr leftRecordPtr, MyDB_RecordPtr rightRecordPtr) {
+    vector<MyDB_PageReaderWriter> res;
+    RecordComparator recordComparator(comparator, leftRecordPtr, rightRecordPtr);
+    MyDB_PageReaderWriter* pageReaderWriter = new MyDB_PageReaderWriter(*bufferManager);
+    while(true) {
+        // get 2 rec iterator
+        if (recordComparator(lhs->getCurrentPointer(), rhs->getCurrentPointer())) {
+            lhs->getCurrent(leftRecordPtr);
+            // check whether tmp page is full
+            // write the current one
+            if (!pageReaderWriter->append(leftRecordPtr)) {
+                res.push_back(*pageReaderWriter);
+                pageReaderWriter = new MyDB_PageReaderWriter(*bufferManager);
+            }
+            if (!lhs->advance()) {
+                // append the rest of right ptr
+                rhs->getCurrent(rightRecordPtr);
+                while (rhs->advance()) {
+                    if (!pageReaderWriter->append(rightRecordPtr)) {
+                        res.push_back(*pageReaderWriter);
+                        pageReaderWriter = new MyDB_PageReaderWriter(*bufferManager);
+                    }
+                    rhs->getCurrent(rightRecordPtr);
+                }
+                break;
+            }
+        } else {
+            rhs->getCurrent(rightRecordPtr);
+            if (!pageReaderWriter->append(rightRecordPtr)) {
+                res.push_back(*pageReaderWriter);
+                pageReaderWriter = new MyDB_PageReaderWriter(*bufferManager);
+            }
+            if (!rhs->advance()) {
+                // append the rest of left iter
+                lhs->getCurrent(leftRecordPtr);
+                while (lhs->advance()) {
+                    if (!pageReaderWriter->append(leftRecordPtr)) {
+                        res.push_back(*pageReaderWriter);
+                        pageReaderWriter = new MyDB_PageReaderWriter(*bufferManager);
+                    }
+                    lhs->getCurrent(leftRecordPtr);
+                }
+                break;
+            }
+        }
+    }
+    return res;
+}
+
 	
 void sort (int runSize, MyDB_TableReaderWriter &inTable, MyDB_TableReaderWriter &outTable, function <bool ()> comparator, MyDB_RecordPtr lhs, MyDB_RecordPtr rhs) {
 	MyDB_BufferManagerPtr bufferManager = inTable.getBufferMgr();
