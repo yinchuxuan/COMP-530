@@ -65,11 +65,11 @@ void sort (int runSize, MyDB_TableReaderWriter &inTable, MyDB_TableReaderWriter 
 			vector<MyDB_PageReaderWriter> secondList = pageListQueue.front();
 			pageListQueue.pop();
 
-			pageListQueue.push(mergeIntoList(bufferManager, firstList[0].getIteratorAlt(firstList), firstList[0].getIteratorAlt(secondList), comparator, lhs, rhs));
+			pageListQueue.push(mergeIntoList(bufferManager, getIteratorAlt(firstList), getIteratorAlt(secondList), comparator, lhs, rhs));
 		}
 
 		sortedRunList.push_back(pageListQueue.front());
-		runIteratorList.push_back(pageListQueue.front()[0].getIterator.getIteratorAlt(pageListQueue.front()));
+		runIteratorList.push_back(getIteratorAlt(pageListQueue.front()));
 	}
 
 	mergeIntoFile(outTable, runIteratorList, comparator, lhs, rhs);
