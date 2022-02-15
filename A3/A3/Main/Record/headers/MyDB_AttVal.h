@@ -2,6 +2,7 @@
 #ifndef ATT_VAL_H
 #define ATT_VAL_H
 
+#include <cstring>
 #include <memory>
 #include <string>
 
