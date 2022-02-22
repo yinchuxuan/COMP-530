@@ -71,25 +71,21 @@ vector <MyDB_PageReaderWriter> mergeIntoList (MyDB_BufferManagerPtr bufferManage
     vector<MyDB_PageReaderWriter> res;
     RecordComparator recordComparator(comparator, leftRecordPtr, rightRecordPtr);
     MyDB_PageReaderWriter* pageReaderWriter = new MyDB_PageReaderWriter(*bufferManager);
-	int index = 0;
 
     while(true) {
         // get 2 rec iterator
         if (recordComparator(lhs->getCurrentPointer(), rhs->getCurrentPointer())) {
             lhs->getCurrent(leftRecordPtr);
 			appendRecord(&pageReaderWriter, leftRecordPtr, res, bufferManager);
-			index++;
 
             if (!lhs->advance()) {
                 // append the rest of right ptr
                 rhs->getCurrent(rightRecordPtr);
 				appendRecord(&pageReaderWriter, rightRecordPtr, res, bufferManager);
-				index++;
 
                 while (rhs->advance()) {
                     rhs->getCurrent(rightRecordPtr);
                     appendRecord(&pageReaderWriter, rightRecordPtr, res, bufferManager);
-					index++;
                 }
 
                 break;
@@ -97,18 +93,15 @@ vector <MyDB_PageReaderWriter> mergeIntoList (MyDB_BufferManagerPtr bufferManage
         } else {
             rhs->getCurrent(rightRecordPtr);
 			appendRecord(&pageReaderWriter, rightRecordPtr, res, bufferManager);
-			index++;
 
             if (!rhs->advance()) {
                 // append the rest of left iter
                 lhs->getCurrent(leftRecordPtr);
 				appendRecord(&pageReaderWriter, leftRecordPtr, res, bufferManager);
-				index++;
 
                 while (lhs->advance()) {
                     lhs->getCurrent(leftRecordPtr);
 					appendRecord(&pageReaderWriter, leftRecordPtr, res, bufferManager);
-					index++;
                 }
 
                 break;
@@ -149,13 +142,6 @@ void sort (int runSize, MyDB_TableReaderWriter &inTable, MyDB_TableReaderWriter 
 			pageListQueue.pop();
 
 			vector<MyDB_PageReaderWriter> result = mergeIntoList(bufferManager, getIteratorAlt(firstList), getIteratorAlt(secondList), comparator, lhs, rhs);
-
-
-			MyDB_RecordIteratorAltPtr ptr1 = getIteratorAlt(firstList);
-			MyDB_RecordIteratorAltPtr ptr2 = getIteratorAlt(secondList);
-			MyDB_RecordIteratorAltPtr ptr3 = getIteratorAlt(result);
-			MyDB_RecordPtr tmpRecord = inTable.getEmptyRecord();
-
 			pageListQueue.push(result);
 		}
 
