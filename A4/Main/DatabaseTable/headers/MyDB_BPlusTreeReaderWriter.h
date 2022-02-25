@@ -76,6 +76,18 @@ private:
 	// only if the first record has a key value less than the second record
 	function <bool ()> buildComparator (MyDB_RecordPtr lhs, MyDB_RecordPtr rhs);
 
+	// Count the record number in page
+	int MyDB_BPlusTreeReaderWriter :: countRecordNumberInOnePage(MyDB_PageReaderWriterPtr page); 
+
+	// Append record to page
+	// If page is full, exit
+	inline void MyDB_BPlusTreeReaderWriter :: appendRecordToPage(MyDB_PageReaderWriter& page, MyDB_RecordPtr record); 
+
+	// Get next record from iterator
+	// If no next record, exit
+	inline void MyDB_BPlusTreeReaderWriter :: getNextRecord(MyDB_RecordIteratorPtr iterator, MyDB_RecordPtr tmp_record); 
+
+
 	// the location (page number) of the root in the tree
 	int rootLocation;
 
@@ -84,7 +96,6 @@ private:
 
 	// the number of the attribute that we are ordering on, in the data records
 	int whichAttIsOrdering;
-
 };
 
 #endif
