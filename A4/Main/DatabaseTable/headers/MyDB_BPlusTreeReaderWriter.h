@@ -77,16 +77,18 @@ private:
 	function <bool ()> buildComparator (MyDB_RecordPtr lhs, MyDB_RecordPtr rhs);
 
 	// Count the record number in page
-	int MyDB_BPlusTreeReaderWriter :: countRecordNumberInOnePage(MyDB_PageReaderWriterPtr page); 
+	int countRecordNumberInOnePage(MyDB_PageReaderWriter& page); 
 
 	// Append record to page
 	// If page is full, exit
-	inline void MyDB_BPlusTreeReaderWriter :: appendRecordToPage(MyDB_PageReaderWriter& page, MyDB_RecordPtr record); 
+	inline void appendRecordToPage(MyDB_PageReaderWriter& page, MyDB_RecordPtr record); 
 
 	// Get next record from iterator
 	// If no next record, exit
-	inline void MyDB_BPlusTreeReaderWriter :: getNextRecord(MyDB_RecordIteratorPtr iterator, MyDB_RecordPtr tmp_record); 
+	inline bool getNextRecord(MyDB_RecordIteratorAltPtr iterator, MyDB_RecordPtr& tmp_record); 
 
+	// Print a directory node
+	void printDirectory(MyDB_PageReaderWriter directory);
 
 	// the location (page number) of the root in the tree
 	int rootLocation;
