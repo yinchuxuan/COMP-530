@@ -76,17 +76,27 @@ private:
 	// only if the first record has a key value less than the second record
 	function <bool ()> buildComparator (MyDB_RecordPtr lhs, MyDB_RecordPtr rhs);
 
-	// Count the record number in page
-	int MyDB_BPlusTreeReaderWriter :: countRecordNumberInOnePage(MyDB_PageReaderWriterPtr page); 
+	// Generate range iteratorAlt
+	MyDB_RecordIteratorAltPtr generateRangeIteratorAlt(MyDB_AttValPtr low, MyDB_AttValPtr high, bool isSorting); 
+
+	// Count record number in regular page
+	int countRecordNumberInRegularPage(MyDB_PageReaderWriter& page); 
+
+	// Count record number in directory page
+	int countRecordNumberInDirectoryPage(MyDB_PageReaderWriter& page);
 
 	// Append record to page
 	// If page is full, exit
-	inline void MyDB_BPlusTreeReaderWriter :: appendRecordToPage(MyDB_PageReaderWriter& page, MyDB_RecordPtr record); 
+	inline void appendRecordToPage(MyDB_PageReaderWriter& page, MyDB_RecordPtr record); 
 
 	// Get next record from iterator
 	// If no next record, exit
-	inline void MyDB_BPlusTreeReaderWriter :: getNextRecord(MyDB_RecordIteratorPtr iterator, MyDB_RecordPtr tmp_record); 
+	inline bool getNextRecord(MyDB_RecordIteratorAltPtr iterator, MyDB_RecordPtr& tmp_record); 
 
+	inline bool getNextINRecord(MyDB_RecordIteratorAltPtr iterator, MyDB_INRecordPtr& tmp_record); 
+
+	// Print a directory node
+	void printDirectory(MyDB_PageReaderWriter directory);
 
 	// the location (page number) of the root in the tree
 	int rootLocation;
@@ -99,3 +109,4 @@ private:
 };
 
 #endif
+
