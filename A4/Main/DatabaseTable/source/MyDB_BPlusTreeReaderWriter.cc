@@ -89,64 +89,37 @@ bool MyDB_BPlusTreeReaderWriter :: discoverPages (int page, vector<MyDB_PageRead
 }
 
 void MyDB_BPlusTreeReaderWriter :: append (MyDB_RecordPtr record) {
-	int tmp_page;
-	MyDB_INRecordPtr tmp_in_record = getINRecord();
-	stack<int> trace;		// To store ancesters of nodes
-
 	if (getNumPages() == 1) {	// Needs initialization
 		rootLocation = 0;
 		getTable()->setRootLocation(rootLocation);
 		int initial_page = getNumPages();				// Use the last page as the first leaf page
 		MyDB_INRecordPtr new_in_record = getINRecord();
 
+		(*this)[rootLocation].clear();
 		(*this)[rootLocation].setType(DirectoryPage);	// Root page should be a directory page
+		(*this)[initial_page].clear();
 		(*this)[initial_page].setType(RegularPage);
 
 		new_in_record->setPtr(initial_page);			// Create a max in_record pointing to the initial page 
 
-		append(rootLocation, new_in_record);
+		(*this)[rootLocation].append(new_in_record);
 	}
 
-	tmp_page = rootLocation;
+	MyDB_RecordPtr new_in_record = append(rootLocation, record);
 
-	// First find the page that this record should append on
-	while ((*this)[tmp_page].getType() == DirectoryPage) {
-		MyDB_RecordIteratorAltPtr iterator = (*this)[tmp_page].getIteratorAlt();
-		trace.push(tmp_page);
+	if (new_in_record != nullptr) {	// Splitting on root 
+		int new_root_page_num = getNumPages();		// Create a new root page
+		MyDB_PageReaderWriter new_root = (*this)[new_root_page_num];	
+		MyDB_INRecordPtr max_record = getINRecord();
 
-		while (iterator->advance()) {
-			iterator->getCurrent(tmp_in_record);
-
-			if (buildComparator(record, tmp_in_record)()) {
-				tmp_page = tmp_in_record->getPtr();
-			}
-		}
-	}
-
-	MyDB_RecordPtr new_in_record = append(tmp_page, record);
-
-	while (new_in_record != nullptr) {	// A splitting happens
-		if (trace.empty()) {			// Splitting on root
-			int new_root_page_num = getNumPages();		// Create a new root page
-			MyDB_PageReaderWriter new_root = (*this)[new_root_page_num];	
-			MyDB_INRecordPtr max_record = getINRecord();
-
-			new_root.setType(DirectoryPage);
-			max_record->setPtr(rootLocation);
-			new_root.append(new_in_record);
-			new_root.append(max_record);
-			
-			rootLocation = new_root_page_num;
-			getTable()->setRootLocation(new_root_page_num);
-
-			break;
-		} else {
-			int parent = trace.top();
-			trace.pop();
-
-			new_in_record = append(parent, new_in_record);
-		}
-	}
+		new_root.setType(DirectoryPage);
+		max_record->setPtr(rootLocation);
+		new_root.append(new_in_record);
+		new_root.append(max_record);
+		
+		rootLocation = new_root_page_num;
+		getTable()->setRootLocation(new_root_page_num);
+	}		
 }
 
 int MyDB_BPlusTreeReaderWriter :: countRecordNumberInRegularPage(MyDB_PageReaderWriter& page) {
@@ -357,17 +330,33 @@ MyDB_RecordPtr MyDB_BPlusTreeReaderWriter :: split (MyDB_PageReaderWriter splitt
 MyDB_RecordPtr MyDB_BPlusTreeReaderWriter :: append (int pageNum, MyDB_RecordPtr record) {
 	MyDB_RecordPtr result = nullptr;
 
-	if (!(*this)[pageNum].append(record)) {		// Then needs spliting this node
-		result = split((*this)[pageNum], record);
-	}
+	if ((*this)[pageNum].getType() == RegularPage) {
+		if (!(*this)[pageNum].append(record)) {
+			result = split((*this)[pageNum], record);
+		}
+	} else {
+		MyDB_RecordIteratorAltPtr iterator = (*this)[pageNum].getIteratorAlt();
+		MyDB_INRecordPtr tmp_in_record = getINRecord();
 
-	if ((*this)[pageNum].getType() == DirectoryPage) {		// internal node, needing sorting
-		MyDB_INRecordPtr lhs = getINRecord();
-		MyDB_INRecordPtr rhs = getINRecord();
-		(*this)[pageNum].sortInPlace(buildComparator(lhs, rhs), lhs, rhs);
+		while (iterator->advance()) {
+			iterator->getCurrent(tmp_in_record);
 
-		if (result != nullptr) {		// Also needs to sort another part
-			(*this)[result->getAtt(1)->toInt()].sortInPlace(buildComparator(lhs, rhs), lhs, rhs);
+			if (buildComparator(record, tmp_in_record)()) {		// Should append
+				result = append(tmp_in_record->getPtr(), record);
+				
+				if (result != nullptr) {	// Splitting happens!
+					if (!(*this)[pageNum].append(result)) {
+						result = split((*this)[pageNum], result);
+					} else {
+						MyDB_INRecordPtr lhs = getINRecord();
+						MyDB_INRecordPtr rhs = getINRecord();
+						(*this)[pageNum].sortInPlace(buildComparator(lhs, rhs), lhs, rhs);
+						result = nullptr;
+					}		
+				}
+
+				break;
+			}
 		}
 	}
 
