@@ -46,9 +46,10 @@ int check_SFWQuery(struct SFWQuery* query, MyDB_CatalogPtr catalog) {
     if (check_disjunctions(query->getDisjunctions(), alias_map)) {
         return 1;
     }
-
     // Check groupings
-
+    if (check_groupValues(query->getDisjunctions(), alias_map)) {
+        return 1;
+    }
 
     return 0;
 }
@@ -90,6 +91,34 @@ int check_disjunctions(vector<ExprTreePtr>& expressions, unordered_map<string, M
         }
     }
 
+    return 0;
+}
+
+int check_groupValues(vector<ExprTreePtr>& selectedValues, vector<ExprTreePtr>& groupings, unordered_map<string, MyDB_TablePtr>& alias_map){
+    if (groupings.size() == 0) {
+        return 0;
+    }
+    for (auto expression: selectedValues) {
+        // if expression is an aggregation function, skip
+        bool found = false;
+        if (typeid(expression) == typeId(SumOp) || typeid(expression) == typeid(AvgOp)) {
+            continue;
+        }
+        expression.toString();
+        for (auto group: groupings) {
+            // check if this attribute is in groupings
+            // if group.attribute = expression.attribute, found = true
+            if (expression.toString().compare(group.toString())) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return 1;
+        } else {
+            found = false;
+        }
+    }
     return 0;
 }
 
