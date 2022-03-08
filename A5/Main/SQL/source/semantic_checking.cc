@@ -47,7 +47,8 @@ int check_SFWQuery(struct SFWQuery* query, MyDB_CatalogPtr catalog) {
         return 1;
     }
     // Check groupings
-    if (check_groupValues(query->getSelectedValues() , query->getDisjunctions(), alias_map)) {
+    if (check_groupValues(query->getSelectedValues() , query->getGrouping(), alias_map)) {
+        cout << "Parse Error: check grouping failed! " << endl;
         return 1;
     }
 
@@ -112,14 +113,16 @@ int check_groupValues(vector<ExprTreePtr>& selectedValues, vector<ExprTreePtr>& 
     for (auto expression: selectedValues) {
         // if expression is an aggregation function, skip
         bool found = false;
-        if (typeid(expression) == typeid(SumOp) || typeid(expression) == typeid(AvgOp)) {
+//        cout << "select expr's type is " << typeid(*expression).name() << endl;
+//        cout << "typeid(SumOp) is " << typeid(SumOp).name() << endl;
+        if (typeid(*expression).name() == typeid(SumOp).name() || typeid(*expression).name() == typeid(AvgOp).name()) {
             continue;
         }
-        expression->toString();
         for (auto group: groupings) {
             // check if this attribute is in groupings
             // if group.attribute = expression.attribute, found = true
-            if (expression->toString().compare(group->toString())) {
+
+            if (expression->toString() == group->toString()) {
                 found = true;
                 break;
             }
