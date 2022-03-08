@@ -1,6 +1,5 @@
 
 CREATE TABLE part (
-
 	p_partkey		INT,
 	p_name		 	STRING,	
 	p_mfgr			STRING,

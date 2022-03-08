@@ -47,7 +47,7 @@ int check_SFWQuery(struct SFWQuery* query, MyDB_CatalogPtr catalog) {
         return 1;
     }
     // Check groupings
-    if (check_groupValues(query->getDisjunctions(), alias_map)) {
+    if (check_groupValues(query->getSelectedValues() , query->getDisjunctions(), alias_map)) {
         return 1;
     }
 
@@ -70,9 +70,11 @@ int check_tables(vector<pair<string, string>>& tables, MyDB_CatalogPtr catalog) 
 int check_selectedValues(vector<ExprTreePtr>& selectedValues, unordered_map<string, MyDB_TablePtr>& alias_map) {
     // Should contain at least one identifier?
     for (auto expression : selectedValues) {
-        expression->check(alias_map);
+        if (expression->check(alias_map)) {
+            return 1;
+        }
 
-        if (expression->getType() == BOOL) {
+        if (expression->getType() == BOOL_EXPR) {
             cout << "Parse Error: wrong type for selected value of " + expression->toString() << endl;
             return 1;
         }
@@ -83,9 +85,11 @@ int check_selectedValues(vector<ExprTreePtr>& selectedValues, unordered_map<stri
 
 int check_disjunctions(vector<ExprTreePtr>& expressions, unordered_map<string, MyDB_TablePtr>& alias_map) {
     for (auto expression : expressions) {
-        expression->check(alias_map);
+        if (expression->check(alias_map)) {
+            return 1;
+        }
 
-        if (expression->getType() != BOOL) {
+        if (expression->getType() != BOOL_EXPR) {
             cout << "Parse Error: wrong type for disjunction term " + expression->toString() + "!" << endl;
             return 1;
         }
@@ -94,21 +98,28 @@ int check_disjunctions(vector<ExprTreePtr>& expressions, unordered_map<string, M
     return 0;
 }
 
-int check_groupValues(vector<ExprTreePtr>& selectedValues, vector<ExprTreePtr>& groupings, unordered_map<string, MyDB_TablePtr>& alias_map){
+int check_groupValues(vector<ExprTreePtr>& selectedValues, vector<ExprTreePtr>& groupings, unordered_map<string, MyDB_TablePtr>& alias_map) {
     if (groupings.size() == 0) {
         return 0;
     }
+
+    for (auto grouping : groupings) {
+        if (grouping->check(alias_map)) {
+            return 1;
+        }
+    }
+
     for (auto expression: selectedValues) {
         // if expression is an aggregation function, skip
         bool found = false;
-        if (typeid(expression) == typeId(SumOp) || typeid(expression) == typeid(AvgOp)) {
+        if (typeid(expression) == typeid(SumOp) || typeid(expression) == typeid(AvgOp)) {
             continue;
         }
-        expression.toString();
+        expression->toString();
         for (auto group: groupings) {
             // check if this attribute is in groupings
             // if group.attribute = expression.attribute, found = true
-            if (expression.toString().compare(group.toString())) {
+            if (expression->toString().compare(group->toString())) {
                 found = true;
                 break;
             }

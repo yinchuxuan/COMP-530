@@ -163,7 +163,10 @@ int main (int numArgs, char **args) {
 					} else if (final->isSFWQuery ()) {
 
 						// print it out
-						final->printSFWQuery ();
+						//final->printSFWQuery ();
+						if (!check_SQLStatement(final, myCatalog)) {
+							cout << "Parsing succeed!" << endl;
+						}
 					}
 
 					// get outta here

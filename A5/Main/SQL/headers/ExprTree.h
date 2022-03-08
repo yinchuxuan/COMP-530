@@ -3,8 +3,11 @@
 #define SQL_EXPRESSIONS
 
 #include "MyDB_AttType.h"
+#include "MyDB_Table.h"
+#include <cstring>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 // create a smart pointer for database tables
 using namespace std;
@@ -14,10 +17,10 @@ typedef shared_ptr <ExprTree> ExprTreePtr;
 // this class encapsules a parsed SQL expression (such as "this.that > 34.5 AND 4 = 5")
 
 enum ExprType {
-	NUMBER,
-	BOOL,
-	STRING,
-	IDENTIFIER
+	NUMBER_EXPR,
+	BOOL_EXPR,
+	STRING_EXPR,
+	IDENTIFIER_EXPR
 };
 
 // class ExprTree is a pure virtual class... the various classes that implement it are below
@@ -32,7 +35,7 @@ public:
 	virtual int check(unordered_map<string, MyDB_TablePtr>& alias_map) = 0;
 
 	ExprTree() {
-		type = NUMBER;
+		type = NUMBER_EXPR;
 	}
 	
 	ExprType getType() {
@@ -56,14 +59,14 @@ public:
 
 	string toString () {
 		if (myVal) {
-			return "bool[true]";
+			return "bool_EXPR[true]";
 		} else {
-			return "bool[false]";
+			return "bool_EXPR[false]";
 		}
 	}	
 
 	int check(unordered_map<string, MyDB_TablePtr>& alias_map) {
-		setType(BOOL);
+		setType(BOOL_EXPR);
 		return 0;
 	} 
 
@@ -77,7 +80,7 @@ public:
 
 	DoubleLiteral (double fromMe) {
 		myVal = fromMe;
-		type = NUMBER;
+		type = NUMBER_EXPR;
 	}
 
 	string toString () {
@@ -85,7 +88,7 @@ public:
 	}	
 
 	int check(unordered_map<string, MyDB_TablePtr>& alias_map) {
-		setType(NUMBER);
+		setType(NUMBER_EXPR);
 		return 0;
 	}
 
@@ -108,7 +111,7 @@ public:
 	}
 
 	int check(unordered_map<string, MyDB_TablePtr>& alias_map) {
-		setType(NUMBER);
+		setType(NUMBER_EXPR);
 		return 0;
 	}
 
@@ -131,7 +134,7 @@ public:
 	}
 
 	int check(unordered_map<string, MyDB_TablePtr>& alias_map) {
-		setType(STRING);
+		setType(STRING_EXPR);
 		return 0;
 	}
 
@@ -164,9 +167,16 @@ public:
 				cout << "Parse Error: table " + tableName + " has no attribute " + attName + "!" << endl;
 				return 1;
 			}
-		}
 
-		setType(IDENTIFIER);
+			MyDB_AttTypePtr type = atts.second;
+			if (type->toString() == "int" || type->toString() == "double") {
+				setType(NUMBER_EXPR);
+			} else if (type->toString() == "string") {
+				setType(STRING_EXPR);
+			} else if (type->toString() == "bool") {
+				setType(BOOL_EXPR);
+			}
+		}
 
 		return 0;
 	}
@@ -196,16 +206,16 @@ public:
 		if (lhs->check(alias_map) || rhs->check(alias_map)) {
             return 1;
         }
-		if (lhs->getType() != NUMBER || lhs->getType() != IDENTIFIER) {
+		if (lhs->getType() != NUMBER_EXPR && lhs->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for minus formula term " + lhs->toString() << "!" << endl; 
 			return 1;
 		}
-		if (rhs->getType() != NUMBER || rhs->getType() != IDENTIFIER) {
+		if (rhs->getType() != NUMBER_EXPR && rhs->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for minus formula term " + rhs->toString() << "!" << endl; 
 			return 1;
 		}
 
-		setType(NUMBER);
+		setType(NUMBER_EXPR);
 
 		return 0;
 	}
@@ -235,27 +245,27 @@ public:
 		if (lhs->check(alias_map) || rhs->check(alias_map)) {
             return 1;
         }
-		if (lhs->getType() == NUMBER) {
-			if (rhs->getType() != NUMBER || rhs->getType() != IDENTIFIER) {
+		if (lhs->getType() == NUMBER_EXPR) {
+			if (rhs->getType() != NUMBER_EXPR && rhs->getType() != IDENTIFIER_EXPR) {
 				cout << "Parse Error: wrong type for plus formula term " + rhs->toString() << "!" << endl; 
 				return 1;
 			}
 
-			setType(NUMBER);
-		} else if (lhs->getType() == STRING) {
-			if (rhs->getType() != STRING || rhs->getType() != IDENTIFIER) {
+			setType(NUMBER_EXPR);
+		} else if (lhs->getType() == STRING_EXPR) {
+			if (rhs->getType() != STRING_EXPR && rhs->getType() != IDENTIFIER_EXPR) {
 				cout << "Parse Error: wrong type for concatenation formula term " + rhs->toString() << "!" << endl; 
 				return 1;
 			}
 
-			setType(STRING);
-		} else if (lhs->getType() == IDENTIFIER) {
-			if (rhs->getType() == STRING) {
-				setType(STRING);
-			} else if (rhs->getType() == NUMBER) {
-				setType(NUMBER);
-			} else if (rhs->getType() == IDENTIFIER) {
-				setType(IDENTIFIER);
+			setType(STRING_EXPR);
+		} else if (lhs->getType() == IDENTIFIER_EXPR) {
+			if (rhs->getType() == STRING_EXPR) {
+				setType(STRING_EXPR);
+			} else if (rhs->getType() == NUMBER_EXPR) {
+				setType(NUMBER_EXPR);
+			} else if (rhs->getType() == IDENTIFIER_EXPR) {
+				setType(IDENTIFIER_EXPR);
 			} else {
 				cout << "Parse Error: wrong type for plus formula term " + rhs->toString() << "!" << endl; 
 				return 1;
@@ -293,16 +303,16 @@ public:
 		if (lhs->check(alias_map) || rhs->check(alias_map)) {
             return 1;
         }
-		if (lhs->getType() != NUMBER || lhs->getType() != IDENTIFIER) {
+		if (lhs->getType() != NUMBER_EXPR && lhs->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for times formula term " + lhs->toString() << "!" << endl; 
 			return 1;
 		}
-		if (rhs->getType() != NUMBER || rhs->getType() != IDENTIFIER) {
+		if (rhs->getType() != NUMBER_EXPR && rhs->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for times formula term " + rhs->toString() << "!" << endl; 
 			return 1;
 		}
 
-		setType(NUMBER);
+		setType(NUMBER_EXPR);
 
 		return 0;
 	}
@@ -332,16 +342,16 @@ public:
 		if (lhs->check(alias_map) || rhs->check(alias_map)) {
             return 1;
         }
-		if (lhs->getType() != NUMBER && lhs->getType() != IDENTIFIER) {
+		if (lhs->getType() != NUMBER_EXPR && lhs->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for divide formula term " + lhs->toString() << "!" << endl; 
 			return 1;
 		}
-		if (rhs->getType() != NUMBER && rhs->getType() != IDENTIFIER) {
+		if (rhs->getType() != NUMBER_EXPR && rhs->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for divide formula term " + rhs->toString() << "!" << endl; 
 			return 1;
 		}
 
-		setType(NUMBER);
+		setType(NUMBER_EXPR);
 
 		return 0;
 	}
@@ -372,18 +382,18 @@ public:
             return 1;
         }
 
-		if (lhs->getType() == IDENTIFIER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER && rhs->getType() != STRING) {
+		if (lhs->getType() == IDENTIFIER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == NUMBER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER) {
+		} else if (lhs->getType() == NUMBER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == STRING) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != STRING) {
+		} else if (lhs->getType() == STRING_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
@@ -392,7 +402,7 @@ public:
 			return 1;
 		}
 
-		setType(BOOL);
+		setType(BOOL_EXPR);
 
 		return 0;
 	}
@@ -423,18 +433,18 @@ public:
             return 1;
         }
 
-		if (lhs->getType() == IDENTIFIER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER && rhs->getType() != STRING) {
+		if (lhs->getType() == IDENTIFIER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == NUMBER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER) {
+		} else if (lhs->getType() == NUMBER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == STRING) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != STRING) {
+		} else if (lhs->getType() == STRING_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
@@ -443,7 +453,7 @@ public:
 			return 1;
 		}
 
-		setType(BOOL);
+		setType(BOOL_EXPR);
 
 		return 0;
 	}
@@ -465,23 +475,27 @@ public:
 		rhs = rhsIn;
 	}
 
+	string toString () {
+		return "!= (" + lhs->toString () + ", " + rhs->toString () + ")";
+	}
+
 	int check(unordered_map<string, MyDB_TablePtr>& alias_map) {
 		if (lhs->check(alias_map) || rhs->check(alias_map)) {
             return 1;
         }
 
-		if (lhs->getType() == IDENTIFIER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER && rhs->getType() != STRING) {
+		if (lhs->getType() == IDENTIFIER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == NUMBER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER) {
+		} else if (lhs->getType() == NUMBER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == STRING) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != STRING) {
+		} else if (lhs->getType() == STRING_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
@@ -490,7 +504,7 @@ public:
 			return 1;
 		}
 
-		setType(BOOL);
+		setType(BOOL_EXPR);
 
 		return 0;
 	}
@@ -521,16 +535,16 @@ public:
             return 1;
         }
 
-		if (lhs->getType() != BOOL) {
+		if (lhs->getType() != BOOL_EXPR) {
 			cout << "Parse Error: wrong type for logical operation term " + lhs->toString() + "!" << endl;
 			return 1;
 		}	
-		if (rhs->getType() != BOOL) {
+		if (rhs->getType() != BOOL_EXPR) {
 			cout << "Parse Error: wrong type for logical operation term " + lhs->toString() + "!" << endl;
 			return 1;
 		}
 
-		setType(BOOL);
+		setType(BOOL_EXPR);
 
 		return 0;
 	}
@@ -561,18 +575,18 @@ public:
             return 1;
         }
 
-		if (lhs->getType() == IDENTIFIER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER && rhs->getType() != STRING) {
+		if (lhs->getType() == IDENTIFIER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == NUMBER) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != NUMBER) {
+		} else if (lhs->getType() == NUMBER_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != NUMBER_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
-		} else if (lhs->getType() == STRING) {
-			if (rhs->getType() != IDENTIFIER && rhs->getType() != STRING) {
+		} else if (lhs->getType() == STRING_EXPR) {
+			if (rhs->getType() != IDENTIFIER_EXPR && rhs->getType() != STRING_EXPR) {
 				cout << "Parse Error: wrong type for comparation term " + rhs->toString() + "!" << endl;
 				return 1;
 			}
@@ -581,7 +595,7 @@ public:
 			return 1;
 		}
 
-		setType(BOOL);
+		setType(BOOL_EXPR);
 
 		return 0;
 	}
@@ -614,12 +628,12 @@ public:
             return 1;
         }
 
-		if (child->getType() != BOOL) {
+		if (child->getType() != BOOL_EXPR) {
 			cout << "Parse Error: wrong type for logical operation term " + child->toString() + "!" << endl;
 			return 1;
 		}	
 
-		setType(BOOL);
+		setType(BOOL_EXPR);
 
 		return 0;
 	}
@@ -648,12 +662,12 @@ public:
             return 1;
         }
 
-		if (child->getType() != NUMBER && child->getType() != IDENTIFIER) {
+		if (child->getType() != NUMBER_EXPR && child->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for sum operation term " + child->toString() + "!" << endl;
 			return 1;
 		}	
 
-		setType(NUMBER);
+		setType(NUMBER_EXPR);
 
 		return 0;
 	}
@@ -682,12 +696,12 @@ public:
             return 1;
         }
 
-		if (child->getType() != NUMBER && child->getType() != IDENTIFIER) {
+		if (child->getType() != NUMBER_EXPR && child->getType() != IDENTIFIER_EXPR) {
 			cout << "Parse Error: wrong type for avg operation term " + child->toString() + "!" << endl;
 			return 1;
 		}	
 
-		setType(NUMBER);
+		setType(NUMBER_EXPR);
 
 		return 0;
 	}
