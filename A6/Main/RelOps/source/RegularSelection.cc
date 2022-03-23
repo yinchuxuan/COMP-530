@@ -22,11 +22,11 @@ void RegularSelection :: run () {
         finalComputations.push_back (combinedRec->compileComputation (s));
     }
     // now, iterate through the input table
-    MyDB_RecordIteratorPtr myIter = rightTable->getIterator (input);
+    MyDB_RecordIteratorPtr myIter = input->getIterator (inputRec);
     while(myIter->hasNext()) {
         myIter->getNext ();
         // see if it is accepted by the preicate
-        if (myIter ()->toBool ()) {
+        if (inputPred ()->toBool ()) {
             // run all of the computations
             int i = 0;
             for (auto &f : finalComputations) {
