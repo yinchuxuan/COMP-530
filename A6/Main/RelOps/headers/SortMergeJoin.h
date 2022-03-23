@@ -41,6 +41,20 @@ public:
 	
 	// execute the join
 	void run ();
+
+private:
+
+	string finalSelectionPredicate;
+	pair <string, string> equalityCheck;
+	vector <string> projections;
+	MyDB_TableReaderWriterPtr output;	
+	MyDB_TableReaderWriterPtr leftTable;
+	MyDB_TableReaderWriterPtr rightTable;
+	string leftSelectionPredicate;
+	string rightSelectionPredicate;
+	int runSize;
+
+	void SortMergeJoin::sortIntoRuns(vector<vector<MyDB_PageReaderWriter>>& runs, vector<MyDB_RecordIteratorAltPtr>& runIterators, string side);
 };
 
 #endif
