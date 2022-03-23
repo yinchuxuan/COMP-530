@@ -6,7 +6,7 @@
 
 BPlusSelection :: BPlusSelection (MyDB_BPlusTreeReaderWriterPtr inputIn, MyDB_TableReaderWriterPtr outputIn,
                 MyDB_AttValPtr lowIn, MyDB_AttValPtr highIn,
-                string selectionPredicateIn, vector <string> projections) {
+                string selectionPredicateIn, vector <string> projectionsIn) {
     input = inputIn;
     output = outputIn;
     low = lowIn;

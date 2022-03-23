@@ -131,7 +131,7 @@ void SortMergeJoin :: run () {
     func rightCmp = rightTmp->compileComputation(rightEqualityCheck);
 
 	// and get the schema that results from combining the left and right records
-	MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
+-	MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
 	for (auto &p : leftTable->getTable ()->getSchema ()->getAtts ())
 		mySchemaOut->appendAtt (p);
 	for (auto &p : rightTable->getTable ()->getSchema ()->getAtts ())
