@@ -22,10 +22,10 @@ void BPlusSelection :: run () {
     // and get the final set of computations that will be used to build the output record
     vector <func> finalComputations;
     for (string s : projections) {
-        finalComputations.push_back (combinedRec->compileComputation (s));
+        finalComputations.push_back (inputRec->compileComputation (s));
     }
     // now, iterate through the input table
-    MyDB_RecordIteratorPtr myIter = input->getRangeIteratorAlt(low, high);
+    MyDB_RecordIteratorAltPtr myIter = input->getRangeIteratorAlt(low, high);
     while(myIter->advance()) {
         myIter->getCurrent (inputRec);
         // see if it is accepted by the preicate

@@ -67,7 +67,7 @@ int main () {
 	supplierTableL->loadFromTextFile ("supplier.tbl");
 	cout << "loading right table.\n";
 	supplierTableRNoBPlus->loadFromTextFile ("supplierBig.tbl");
-
+/*
 	{
 		// get the output schema and table
 		MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
@@ -91,8 +91,8 @@ int main () {
                 MyDB_RecordPtr temp = supplierTableOut->getEmptyRecord ();
                 MyDB_RecordIteratorAltPtr myIter = supplierTableOut->getIteratorAlt ();
 
-                while (myIter->advance ()) {
-                        myIter->getCurrent (temp);
+		while (myIter->advance ()) {
+			myIter->getCurrent (temp);
 			cout << temp << "\n";
 		}
 
@@ -264,13 +264,13 @@ int main () {
 			cout << temp << "\n";
                 }
 	}
-
+*/
 	MyDB_BPlusTreeReaderWriterPtr supplierTableR = make_shared <MyDB_BPlusTreeReaderWriter> ("r_address", myTableRight, myMgr);
 	MyDB_TablePtr myTableRightNoBPlus = make_shared <MyDB_Table> ("supplierRightNoBPlus", "supplierRightNoBPlus.bin", mySchemaR);
 
 	cout << "loading right into B+-Tree indexed on r_address.\n";
 	supplierTableR->loadFromTextFile ("supplierBig.tbl");
-
+/*
 	{
 
 		// get the output schema and table
@@ -507,6 +507,7 @@ int main () {
 			cout << temp << "\n";
                 }
 	}
+*/
 
 	{
 		// get the output schema and table

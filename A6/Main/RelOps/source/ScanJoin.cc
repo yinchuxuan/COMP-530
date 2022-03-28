@@ -133,7 +133,7 @@ void ScanJoin :: run () {
 
 	// this is the output record
 	MyDB_RecordPtr outputRec = output->getEmptyRecord ();
-	
+
 	// now, iterate through the right table
 	MyDB_RecordIteratorPtr myIterAgain = rightTable->getIterator (rightInputRec);
 	while (myIterAgain->hasNext ()) {
@@ -168,7 +168,6 @@ void ScanJoin :: run () {
 
 			// check to see if it is accepted by the join predicate
 			if (finalPredicate ()->toBool ()) {
-
 				// run all of the computations
 				int i = 0;
 				for (auto &f : finalComputations) {
@@ -181,7 +180,7 @@ void ScanJoin :: run () {
 				// or else the record's internal buffer may cause it
 				// to write old values
 				outputRec->recordContentHasChanged ();
-				output->append (outputRec);	
+				output->append (outputRec);
 			}
 		}
 	}

@@ -7,6 +7,7 @@
 #include "MyDB_PageReaderWriter.h"
 #include "MyDB_PageListIteratorSelfSortingAlt.h"
 #include "RecordComparator.h"
+#include <algorithm>
 
 MyDB_BPlusTreeReaderWriter :: MyDB_BPlusTreeReaderWriter (string orderOnAttName, MyDB_TablePtr forMe, 
 	MyDB_BufferManagerPtr myBuffer) : MyDB_TableReaderWriter (forMe, myBuffer) {

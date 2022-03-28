@@ -54,7 +54,7 @@ private:
 	string rightSelectionPredicate;
 	int runSize;
 
-	void SortMergeJoin::sortIntoRuns(vector<vector<MyDB_PageReaderWriter>>& runs, vector<MyDB_RecordIteratorAltPtr>& runIterators, string side);
+	void sortIntoRuns(vector<vector<MyDB_PageReaderWriter>>& runs, vector<MyDB_RecordIteratorAltPtr>& runIterators, string side);
 };
 
 #endif
