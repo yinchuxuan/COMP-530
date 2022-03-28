@@ -13,11 +13,11 @@ using namespace std;
 Aggregate :: Aggregate (MyDB_TableReaderWriterPtr inputIn, MyDB_TableReaderWriterPtr outputIn,
                 vector<pair<MyDB_AggType, string>> aggsToComputeIn,
                 vector<string>groupingsIn, string selectionPredicateIn) {
-    if (output->getTable ()->getSchema ()->getAtts ().size () != aggsToCompute.size () + groupings.size ()) {
+    if (outputIn->getTable()->getSchema()->getAtts().size() != aggsToComputeIn.size () + groupingsIn.size ()) {
         cout << "error, the output schema needs to have the same number of atts as (# of aggs to compute + # groups).\n";
         return;
     }
-    
+
     input = inputIn;
     output = outputIn;
     aggsToCompute = aggsToComputeIn;
@@ -31,15 +31,6 @@ void Aggregate :: run () {
     int aggregateAttNumber = aggsToCompute.size();
     int groupNumber = groupings.size();
     int i;
-
-	// get all of the pages
-	vector <MyDB_PageReaderWriter> allData;
-	for (int i = 0; i < input->getNumPages (); i++) {
-		MyDB_PageReaderWriter temp = input->getPinned (i);
-		if (temp.getType () == MyDB_PageType :: RegularPage) {
-			allData.push_back (input->getPinned (i));
-        }
-	}
 
     // build a schema that contains all output and counts
     MyDB_SchemaPtr aggregateSchema = make_shared<MyDB_Schema>();
@@ -56,7 +47,7 @@ void Aggregate :: run () {
     for (auto &p : aggregateSchema->getAtts ()) {
 		combinedSchema->appendAtt (p);
     }
-    
+
     MyDB_RecordPtr originRecord = input->getEmptyRecord();
     MyDB_RecordPtr aggregateRecord = make_shared<MyDB_Record>(aggregateSchema);
     MyDB_RecordPtr combinedRecord = make_shared<MyDB_Record>(combinedSchema);
@@ -73,25 +64,27 @@ void Aggregate :: run () {
 	}
     vector<func> updateAggregateAtts;
     for (int i = 0; i < aggregateAttNumber; i++) {
-        updateAggregateAtts.push_back(combinedRecord->compileComputation("+ (" + aggsToCompute[i].second + ", [" + aggregateSchema->getAtts()[i].second + "])"));
+        updateAggregateAtts.push_back(combinedRecord->compileComputation("+ (" + aggsToCompute[i].second + ", [" + aggregateSchema->getAtts()[i + groupNumber].first + "])"));
     }
     vector<func> finalAggComps;
     for (int i = 0; i < aggregateAttNumber; i++) {
         if (aggsToCompute[i].first == sum) {
-            finalAggComps.push_back(combinedRecord->compileComputation("[" + combinedSchema->getAtts()[i].second + "]"));
+            finalAggComps.push_back(aggregateRecord->compileComputation("[" + aggregateSchema->getAtts()[i + groupNumber].first + "]"));
         }
         if (aggsToCompute[i].first == avg) {
-            finalAggComps.push_back(combinedRecord->compileComputation("/ (" + combinedSchema->getAtts()[i].second + ", [" + combinedSchema->getAtts()[groupNumber + aggregateAttNumber].second + "])"));
+            finalAggComps.push_back(aggregateRecord->compileComputation("/ ([" + aggregateSchema->getAtts()[i + groupNumber].first + "], [" + aggregateSchema->getAtts()[groupNumber + aggregateAttNumber].first + "])"));
         }
         if (aggsToCompute[i].first == cnt) {
-            finalAggComps.push_back(combinedRecord->compileComputation("[" + combinedSchema->getAtts()[groupNumber + aggregateAttNumber].second + "]"));
+            finalAggComps.push_back(aggregateRecord->compileComputation("[" + aggregateSchema->getAtts()[groupNumber + aggregateAttNumber].first + "]"));
         }
     }
 
-    func inputPred = aggregateRecord->compileComputation(selectionPredicate);
+    func inputPred = originRecord->compileComputation(selectionPredicate);
+    func counterInitializer = aggregateRecord->compileComputation("int[1]");
+    func counterIncrease = aggregateRecord->compileComputation("+ ([" + aggregateSchema->getAtts()[groupNumber + aggregateAttNumber].first + "], int[1])");
 
     // add all of the records to the hash table
-	MyDB_RecordIteratorAltPtr myIter = getIteratorAlt(allData);
+	MyDB_RecordIteratorAltPtr myIter = input->getIteratorAlt();
 
     // Iterate over original table
 	while (myIter->advance ()) {
@@ -116,20 +109,17 @@ void Aggregate :: run () {
             for (int i = groupNumber; i < aggregateAttNumber + groupNumber; i++) {
                 aggregateRecord->getAtt(i)->set(aggregateAttributes[i - groupNumber]());
             }
-
-            MyDB_IntAttValPtr counterValue = make_shared<MyDB_IntAttVal>();
-            counterValue->set(1);
-            aggregateRecord->getAtt(groupNumber + aggregateAttNumber)->set(counterValue);
+            aggregateRecord->getAtt(groupNumber + aggregateAttNumber)->set(counterInitializer());
 
             aggregateRecord->recordContentHasChanged();
 
             if (tmpPages.empty()) {
-                tmpPages.push_back(make_shared<MyDB_PageReaderWriter>(true, output->getBufferMgr()));
+                tmpPages.push_back(make_shared<MyDB_PageReaderWriter>(true, *output->getBufferMgr()));
             }
 
             MyDB_PageReaderWriterPtr lastPage = tmpPages[tmpPages.size() - 1];
             if (!(hashtable[hashVal] = lastPage->appendAndReturnLocation(aggregateRecord))) {
-                tmpPages.push_back(make_shared<MyDB_PageReaderWriter>(true, output->getBufferMgr()));
+                tmpPages.push_back(make_shared<MyDB_PageReaderWriter>(true, *output->getBufferMgr()));
                 MyDB_PageReaderWriterPtr lastPage = tmpPages[tmpPages.size() - 1];
             }
         } else {    // update aggregate record
@@ -137,11 +127,10 @@ void Aggregate :: run () {
             for (int i = groupNumber; i < aggregateAttNumber + groupNumber; i++) {
                 aggregateRecord->getAtt(i)->set(updateAggregateAtts[i - groupNumber]());
             }
-
-            MyDB_IntAttValPtr counterValue = dynamic_pointer_cast<MyDB_IntAttVal>(aggregateRecord->getAtt(groupNumber + aggregateAttNumber));
-            counterValue->set(counterValue->toInt() + 1);
+            aggregateRecord->getAtt(groupNumber + aggregateAttNumber)->set(counterIncrease());
 
             aggregateRecord->recordContentHasChanged();
+            aggregateRecord->toBinary(hashtable[hashVal]);
         }
     }
 
@@ -155,6 +144,7 @@ void Aggregate :: run () {
         for (auto a : finalAggComps) {
             outputRecord->getAtt (i++)->set (a());
         }
+
         outputRecord->recordContentHasChanged ();
         output->append(outputRecord);
     }

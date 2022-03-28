@@ -57,6 +57,7 @@ void SortMergeJoin::sortIntoRuns(vector<vector<MyDB_PageReaderWriter>>& runs, ve
 
 	for (int i = 0; i < table->getNumPages(); i += runSize) {
 		queue<vector<MyDB_PageReaderWriter>> pageListQueue;
+        cout << runSize << endl;
 
 		for (int j = 0; j < runSize; j++) {
 			if (i + j >= table->getNumPages()) {
@@ -103,23 +104,27 @@ void SortMergeJoin :: run () {
     func leftCmpRhs = leftRhs->compileComputation(leftEqualityCheck);
     func rightCmpLhs = rightLhs->compileComputation(rightEqualityCheck);
     func rightCmpRhs = rightRhs->compileComputation(rightEqualityCheck);
-    vector<MyDB_RecordIteratorAltPtr> joinLhs;
-    vector<MyDB_RecordIteratorAltPtr> joinRhs;
+    vector<void*> joinLhs;
+    vector<void*> joinRhs;
+    MyDB_RecordIteratorAltPtr leftTop;
+    MyDB_RecordIteratorAltPtr rightTop;
+    MyDB_RecordPtr leftJoinRec = leftTable->getEmptyRecord();
+    MyDB_RecordPtr rightJoinRec = rightTable->getEmptyRecord();
 
-	auto leftCmp = [&leftCmpLhs, &leftCmpRhs, &leftLhs, &leftRhs](MyDB_RecordIteratorAltPtr& ptr1, MyDB_RecordIteratorAltPtr& ptr2) {
+	auto leftComparator = [&leftCmpLhs, &leftCmpRhs, &leftLhs, &leftRhs](MyDB_RecordIteratorAltPtr& ptr1, MyDB_RecordIteratorAltPtr& ptr2) {
         ptr1->getCurrent(leftLhs);
         ptr2->getCurrent(leftRhs);
-		return leftCmpLhs()->hash() < leftCmpRhs()->hash(); 
+		return leftCmpLhs()->hash() > leftCmpRhs()->hash(); 
 	};
 
-	auto rightCmp = [&rightCmpLhs, &rightCmpRhs, &rightLhs, &rightRhs](MyDB_RecordIteratorAltPtr& ptr1, MyDB_RecordIteratorAltPtr& ptr2) {
+	auto rightComparator = [&rightCmpLhs, &rightCmpRhs, &rightLhs, &rightRhs](MyDB_RecordIteratorAltPtr& ptr1, MyDB_RecordIteratorAltPtr& ptr2) {
         ptr1->getCurrent(rightLhs);
         ptr2->getCurrent(rightRhs);
-		return rightCmpLhs()->hash() < rightCmpRhs()->hash(); 
+		return rightCmpLhs()->hash() > rightCmpRhs()->hash(); 
 	};
 
-    priority_queue<MyDB_RecordIteratorAltPtr, vector<MyDB_RecordIteratorAltPtr>, decltype(leftCmp)> leftMinHeap(leftCmp);
-    priority_queue<MyDB_RecordIteratorAltPtr, vector<MyDB_RecordIteratorAltPtr>, decltype(rightCmp)> rightMinHeap(rightCmp);
+    priority_queue<MyDB_RecordIteratorAltPtr, vector<MyDB_RecordIteratorAltPtr>, decltype(leftComparator)> leftMinHeap(leftComparator);
+    priority_queue<MyDB_RecordIteratorAltPtr, vector<MyDB_RecordIteratorAltPtr>, decltype(rightComparator)> rightMinHeap(rightComparator);
 
     // run TPMMS "sort" phase
     sortIntoRuns(leftRuns, leftRunIterators, "left");
@@ -131,15 +136,15 @@ void SortMergeJoin :: run () {
     func rightCmp = rightTmp->compileComputation(rightEqualityCheck);
 
 	// and get the schema that results from combining the left and right records
--	MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
+	MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
 	for (auto &p : leftTable->getTable ()->getSchema ()->getAtts ())
 		mySchemaOut->appendAtt (p);
 	for (auto &p : rightTable->getTable ()->getSchema ()->getAtts ())
-		mySchemaOut->appendAtt (p);
+    mySchemaOut->appendAtt (p);
 
 	// get the combined record
 	MyDB_RecordPtr combinedRec = make_shared <MyDB_Record> (mySchemaOut);
-	combinedRec->buildFrom (leftTmp, rightTmp);
+	combinedRec->buildFrom (leftJoinRec, rightJoinRec);
 
 	func finalPredicate = combinedRec->compileComputation (finalSelectionPredicate);
 
@@ -159,13 +164,17 @@ void SortMergeJoin :: run () {
 		rightMinHeap.push(iterator);
 	}
 
+    cout << "done preparation!" << endl;
+
     while (!leftMinHeap.empty()) {
-        MyDB_RecordIteratorAltPtr leftTop = leftMinHeap.top();
+        leftTop = leftMinHeap.top();
         leftTop->getCurrent(leftTmp);
 
         while (!rightMinHeap.empty()) {
-            MyDB_RecordIteratorAltPtr rightTop = rightMinHeap.top();
+            rightTop = rightMinHeap.top();
             rightTop->getCurrent(rightTmp);
+
+            cout << rightCmp()->hash() << " " << leftCmp()->hash() << endl;
 
             if (rightCmp()->hash() < leftCmp()->hash()) {   // right key is less then left key, skip it
                 rightMinHeap.pop();
@@ -179,7 +188,7 @@ void SortMergeJoin :: run () {
 
                 while (!leftMinHeap.empty() && leftCmp()->hash() == k) {
                     if (leftPred()->toBool()) {
-                        joinLhs.push_back(leftTop);
+                        joinLhs.push_back(leftTop->getCurrentPointer());
                     }
 
                     leftMinHeap.pop();
@@ -187,13 +196,17 @@ void SortMergeJoin :: run () {
                         leftMinHeap.push(leftTop);
                     }
 
-                    MyDB_RecordIteratorAltPtr leftTop = leftMinHeap.top();
+                    if (leftMinHeap.empty()) {
+                        break;
+                    }
+
+                    leftTop = leftMinHeap.top();
                     leftTop->getCurrent(leftTmp);
                 }
 
                 while (!rightMinHeap.empty() && rightCmp()->hash() == k) {
                     if (rightPred()->toBool()) {
-                        joinRhs.push_back(rightTop);
+                        joinRhs.push_back(rightTop->getCurrentPointer());
                     }
 
                     rightMinHeap.pop();
@@ -201,15 +214,21 @@ void SortMergeJoin :: run () {
                         rightMinHeap.push(rightTop);
                     }
 
-                    MyDB_RecordIteratorAltPtr rightTop = rightMinHeap.top();
+                    if (rightMinHeap.empty()) {
+                        break;
+                    }
+
+                    rightTop = rightMinHeap.top();
                     rightTop->getCurrent(rightTmp);
                 }
 
+                cout << "should get there!" << endl;
+
                 for (auto leftRec : joinLhs) {  // join them together
-                    leftRec->getCurrent(leftTmp);
+                    leftJoinRec->fromBinary(leftRec);
 
                     for (auto rightRec : joinRhs) {
-                        rightRec->getCurrent(rightTmp);
+                        rightJoinRec->fromBinary(rightRec);
 
                         if (finalPredicate()->toBool()) {
                             int i = 0;
@@ -226,9 +245,11 @@ void SortMergeJoin :: run () {
                 joinLhs.clear();
                 joinRhs.clear();
             } else {    // right key is greater then left key, skip the left one
-                leftMinHeap.pop();
-                if (leftTop->advance()) {
-                    leftMinHeap.push(leftTop);
+                if (!leftMinHeap.empty()) {
+                    leftMinHeap.pop();
+                    if (leftTop->advance()) {
+                        leftMinHeap.push(leftTop);
+                    }
                 }
 
                 break;

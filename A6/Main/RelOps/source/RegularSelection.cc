@@ -19,13 +19,13 @@ void RegularSelection :: run () {
     // and get the final set of computations that will be used to build the output record
     vector <func> finalComputations;
     for (string s : projections) {
-        finalComputations.push_back (combinedRec->compileComputation (s));
+        finalComputations.push_back (inputRec->compileComputation (s));
     }
     // now, iterate through the input table
     MyDB_RecordIteratorPtr myIter = input->getIterator (inputRec);
     while(myIter->hasNext()) {
         myIter->getNext ();
-        // see if it is accepted by the preicate
+        // see if it is accepted by the predicate
         if (inputPred ()->toBool ()) {
             // run all of the computations
             int i = 0;
