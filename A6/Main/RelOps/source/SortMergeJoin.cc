@@ -31,8 +31,6 @@ void SortMergeJoin :: run () {
     MyDB_RecordPtr rightLhs = rightTable->getEmptyRecord();
     MyDB_RecordPtr rightRhs = rightTable->getEmptyRecord();
     MyDB_RecordPtr rightTmp = rightTable->getEmptyRecord();
-    vector<void*> joinLhs;
-    vector<void*> joinRhs;
     MyDB_RecordPtr leftJoinRec = leftTable->getEmptyRecord();
     MyDB_RecordPtr rightJoinRec = rightTable->getEmptyRecord();
     vector<MyDB_PageReaderWriter> joinLhsPages;

@@ -507,7 +507,7 @@ int main () {
 			cout << temp << "\n";
                 }
 	}
-
+	
 	{
 		// get the output schema and table
 		MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
