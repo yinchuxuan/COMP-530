@@ -508,7 +508,6 @@ int main () {
                 }
 	}
 */
-
 	{
 		// get the output schema and table
 		MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
