@@ -24,116 +24,25 @@ SortMergeJoin :: SortMergeJoin (MyDB_TableReaderWriterPtr leftInputIn, MyDB_Tabl
     runSize = leftTable->getBufferMgr()->numPages / 2;
 }
 
-void SortMergeJoin::sortIntoRuns(vector<vector<MyDB_PageReaderWriter>>& runs, vector<MyDB_RecordIteratorAltPtr>& runIterators, string side) {
-	MyDB_RecordPtr leftCompareRec;
-    MyDB_RecordPtr rightCompareRec;
-    MyDB_TableReaderWriterPtr table;
-    func leftCompareEquality;
-    func rightCompareEquality;
-
-    if (side == "left") {
-        table = leftTable;
-	    leftCompareRec = table->getEmptyRecord ();
-        rightCompareRec = table->getEmptyRecord();
-
-        leftCompareEquality = leftCompareRec->compileComputation(equalityCheck.first);
-        rightCompareEquality = rightCompareRec->compileComputation(equalityCheck.first);
-    } else {
-        table = rightTable;
-	    leftCompareRec = table->getEmptyRecord ();
-        rightCompareRec = table->getEmptyRecord();
-
-        leftCompareEquality = leftCompareRec->compileComputation(equalityCheck.second);
-        rightCompareEquality = rightCompareRec->compileComputation(equalityCheck.second);
-    }
-
-    auto comparator = [&leftCompareEquality, &rightCompareEquality]() {
-        return leftCompareEquality()->hash() < rightCompareEquality()->hash(); 
-    };
-
-    MyDB_BufferManagerPtr bufferManager = table->getBufferMgr();
-	vector<vector<MyDB_PageReaderWriter>> sortedRunList;
-	vector<MyDB_RecordIteratorAltPtr> runIteratorList;
-
-	for (int i = 0; i < table->getNumPages(); i += runSize) {
-		queue<vector<MyDB_PageReaderWriter>> pageListQueue;
-        cout << runSize << endl;
-
-		for (int j = 0; j < runSize; j++) {
-			if (i + j >= table->getNumPages()) {
-				break;
-			}
-
-			// sort each page at first
-			vector<MyDB_PageReaderWriter> tmpPageList({*((*table)[i + j].sort(comparator, leftCompareRec, rightCompareRec))});
-
-			// push each page list in queue (until now each contains a single page)
-			pageListQueue.push(tmpPageList);
-		}
-
-		// repeatedly call merge into list until there is only one page list in queue
-		while (pageListQueue.size() > 1) {
-			vector<MyDB_PageReaderWriter> firstList = pageListQueue.front();
-			pageListQueue.pop();
-			vector<MyDB_PageReaderWriter> secondList = pageListQueue.front();
-			pageListQueue.pop();
-
-			vector<MyDB_PageReaderWriter> result = mergeIntoList(bufferManager, getIteratorAlt(firstList), getIteratorAlt(secondList), comparator, leftCompareRec, rightCompareRec);
-			pageListQueue.push(result);
-		}
-
-		runs.push_back(pageListQueue.front());
-		runIterators.push_back(getIteratorAlt(pageListQueue.front()));
-	}
-}
-
 void SortMergeJoin :: run () {
-    vector<vector<MyDB_PageReaderWriter>> leftRuns;
-    vector<vector<MyDB_PageReaderWriter>> rightRuns;
-    vector<MyDB_RecordIteratorAltPtr> leftRunIterators;
-    vector<MyDB_RecordIteratorAltPtr> rightRunIterators;
-    string leftEqualityCheck = equalityCheck.first;
-    string rightEqualityCheck = equalityCheck.second;
     MyDB_RecordPtr leftLhs = leftTable->getEmptyRecord();
     MyDB_RecordPtr leftRhs = leftTable->getEmptyRecord();
     MyDB_RecordPtr leftTmp = leftTable->getEmptyRecord();
     MyDB_RecordPtr rightLhs = rightTable->getEmptyRecord();
     MyDB_RecordPtr rightRhs = rightTable->getEmptyRecord();
     MyDB_RecordPtr rightTmp = rightTable->getEmptyRecord();
-    func leftCmpLhs = leftLhs->compileComputation(leftEqualityCheck);
-    func leftCmpRhs = leftRhs->compileComputation(leftEqualityCheck);
-    func rightCmpLhs = rightLhs->compileComputation(rightEqualityCheck);
-    func rightCmpRhs = rightRhs->compileComputation(rightEqualityCheck);
     vector<void*> joinLhs;
     vector<void*> joinRhs;
-    MyDB_RecordIteratorAltPtr leftTop;
-    MyDB_RecordIteratorAltPtr rightTop;
     MyDB_RecordPtr leftJoinRec = leftTable->getEmptyRecord();
     MyDB_RecordPtr rightJoinRec = rightTable->getEmptyRecord();
+    vector<MyDB_PageReaderWriter> joinLhsPages;
+    vector<MyDB_PageReaderWriter> joinRhsPages;
+    MyDB_RecordIteratorAltPtr joinLeft;
+    MyDB_RecordIteratorAltPtr joinRight;
+    int finished = 0;
 
-	auto leftComparator = [&leftCmpLhs, &leftCmpRhs, &leftLhs, &leftRhs](MyDB_RecordIteratorAltPtr& ptr1, MyDB_RecordIteratorAltPtr& ptr2) {
-        ptr1->getCurrent(leftLhs);
-        ptr2->getCurrent(leftRhs);
-		return leftCmpLhs()->hash() > leftCmpRhs()->hash(); 
-	};
-
-	auto rightComparator = [&rightCmpLhs, &rightCmpRhs, &rightLhs, &rightRhs](MyDB_RecordIteratorAltPtr& ptr1, MyDB_RecordIteratorAltPtr& ptr2) {
-        ptr1->getCurrent(rightLhs);
-        ptr2->getCurrent(rightRhs);
-		return rightCmpLhs()->hash() > rightCmpRhs()->hash(); 
-	};
-
-    priority_queue<MyDB_RecordIteratorAltPtr, vector<MyDB_RecordIteratorAltPtr>, decltype(leftComparator)> leftMinHeap(leftComparator);
-    priority_queue<MyDB_RecordIteratorAltPtr, vector<MyDB_RecordIteratorAltPtr>, decltype(rightComparator)> rightMinHeap(rightComparator);
-
-    // run TPMMS "sort" phase
-    sortIntoRuns(leftRuns, leftRunIterators, "left");
-    sortIntoRuns(rightRuns, rightRunIterators, "right");
-
-    func leftPred = leftTmp->compileComputation(leftSelectionPredicate);
-    func rightPred = rightTmp->compileComputation(rightSelectionPredicate);
-    func leftCmp = leftTmp->compileComputation(leftEqualityCheck);
-    func rightCmp = rightTmp->compileComputation(rightEqualityCheck);
+    func leftCmp = leftTmp->compileComputation(equalityCheck.first);
+    func rightCmp = rightTmp->compileComputation(equalityCheck.second);
 
 	// and get the schema that results from combining the left and right records
 	MyDB_SchemaPtr mySchemaOut = make_shared <MyDB_Schema> ();
@@ -157,106 +66,94 @@ void SortMergeJoin :: run () {
 	// this is the output record
 	MyDB_RecordPtr outputRec = output->getEmptyRecord ();
 
-    for (auto iterator : leftRunIterators) {
-		leftMinHeap.push(iterator);
-	}
-    for (auto iterator : rightRunIterators) {
-		rightMinHeap.push(iterator);
-	}
+    function<bool()> leftComp = buildRecordComparator(leftLhs, leftRhs, equalityCheck.first);
+    MyDB_RecordIteratorAltPtr left_iter = buildItertorOverSortedRuns(runSize, *leftTable, leftComp, leftLhs, leftRhs, leftSelectionPredicate);
+    function<bool()> rightComp = buildRecordComparator(rightLhs, rightRhs, equalityCheck.second);
+    MyDB_RecordIteratorAltPtr right_iter = buildItertorOverSortedRuns(runSize, *rightTable, rightComp, rightLhs, rightRhs, rightSelectionPredicate);
 
-    cout << "done preparation!" << endl;
+    if (!left_iter->advance() || !right_iter->advance()) {
+        return;
+    }
 
-    while (!leftMinHeap.empty()) {
-        leftTop = leftMinHeap.top();
-        leftTop->getCurrent(leftTmp);
+    while (true) {
+        left_iter->getCurrent(leftTmp);
+        right_iter->getCurrent(rightTmp);
 
-        while (!rightMinHeap.empty()) {
-            rightTop = rightMinHeap.top();
-            rightTop->getCurrent(rightTmp);
+        if (rightCmp()->hash() < leftCmp()->hash()) {   // right key is less then left key, skip it
+            if (!right_iter->advance()) {
+                finished = 1;
+            }
+        } else if (rightCmp()->hash() == leftCmp()->hash()) { // if equals, find all records that could join together 
+            size_t k = leftCmp()->hash();
 
-            cout << rightCmp()->hash() << " " << leftCmp()->hash() << endl;
-
-            if (rightCmp()->hash() < leftCmp()->hash()) {   // right key is less then left key, skip it
-                rightMinHeap.pop();
-                if (rightTop->advance()) {
-                    rightMinHeap.push(rightTop);
+            while (leftCmp()->hash() == k) {
+                if (joinLhsPages.size() == 0) {
+                    MyDB_PageReaderWriter newPage(true, *output->getBufferMgr());
+                    joinLhsPages.push_back(newPage);
+                }
+                if (!joinLhsPages[joinLhsPages.size() - 1].append(leftTmp)) {
+                    MyDB_PageReaderWriter newPage(true, *output->getBufferMgr());
+                    joinLhsPages.push_back(newPage);
+                    joinLhsPages[joinLhsPages.size() - 1].append(leftTmp);
                 }
 
-                continue; 
-            } else if (rightCmp()->hash() == leftCmp()->hash()) { // if equals, find all records that could join together 
-                size_t k = leftCmp()->hash();
-
-                while (!leftMinHeap.empty() && leftCmp()->hash() == k) {
-                    if (leftPred()->toBool()) {
-                        joinLhs.push_back(leftTop->getCurrentPointer());
-                    }
-
-                    leftMinHeap.pop();
-                    if (leftTop->advance()) {
-                        leftMinHeap.push(leftTop);
-                    }
-
-                    if (leftMinHeap.empty()) {
-                        break;
-                    }
-
-                    leftTop = leftMinHeap.top();
-                    leftTop->getCurrent(leftTmp);
+                if (!left_iter->advance()) {
+                    finished = 1;
+                    break;
                 }
 
-                while (!rightMinHeap.empty() && rightCmp()->hash() == k) {
-                    if (rightPred()->toBool()) {
-                        joinRhs.push_back(rightTop->getCurrentPointer());
-                    }
+                left_iter->getCurrent(leftTmp);
+            }
 
-                    rightMinHeap.pop();
-                    if (rightTop->advance()) {
-                        rightMinHeap.push(rightTop);
-                    }
-
-                    if (rightMinHeap.empty()) {
-                        break;
-                    }
-
-                    rightTop = rightMinHeap.top();
-                    rightTop->getCurrent(rightTmp);
+            while (rightCmp()->hash() == k) {
+                if (joinRhsPages.size() == 0) {
+                    MyDB_PageReaderWriter newPage(true, *output->getBufferMgr());
+                    joinRhsPages.push_back(newPage);
+                }
+                if (!joinRhsPages[joinRhsPages.size() - 1].append(rightTmp)) {
+                    MyDB_PageReaderWriter newPage(true, *output->getBufferMgr());
+                    joinRhsPages.push_back(newPage);
+                    joinRhsPages[joinRhsPages.size() - 1].append(rightTmp);
                 }
 
-                cout << "should get there!" << endl;
+                if (!right_iter->advance()) {
+                    finished = 1;
+                    break;
+                }
 
-                for (auto leftRec : joinLhs) {  // join them together
-                    leftJoinRec->fromBinary(leftRec);
+                right_iter->getCurrent(rightTmp);               
+            }
 
-                    for (auto rightRec : joinRhs) {
-                        rightJoinRec->fromBinary(rightRec);
+            joinLeft = getIteratorAlt(joinLhsPages);
 
-                        if (finalPredicate()->toBool()) {
-                            int i = 0;
-                            for (auto &f : finalComputations) {
-                                outputRec->getAtt (i++)->set (f());
-                            }
+            while (joinLeft->advance()) {  // join them together
+                joinLeft->getCurrent(leftJoinRec);
 
-                            outputRec->recordContentHasChanged ();
-                            output->append (outputRec);
+                joinRight = getIteratorAlt(joinRhsPages);
+                while (joinRight->advance()) {
+                    joinRight->getCurrent(rightJoinRec);
+
+                    if (finalPredicate()->toBool()) {
+                        int i = 0;
+                        for (auto &f : finalComputations) {
+                            outputRec->getAtt (i++)->set (f());
                         }
+
+                        outputRec->recordContentHasChanged ();
+                        output->append (outputRec);
                     }
                 }
+            }
 
-                joinLhs.clear();
-                joinRhs.clear();
-            } else {    // right key is greater then left key, skip the left one
-                if (!leftMinHeap.empty()) {
-                    leftMinHeap.pop();
-                    if (leftTop->advance()) {
-                        leftMinHeap.push(leftTop);
-                    }
-                }
-
-                break;
+            joinLhsPages.clear();
+            joinRhsPages.clear();
+        } else {    // right key is greater then left key, skip the left one
+            if (!left_iter->advance()) {
+                finished = 1;
             }
         }
 
-        if (rightMinHeap.empty()) {
+        if (finished) {
             break;
         } 
     }
