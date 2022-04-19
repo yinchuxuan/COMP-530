@@ -5,7 +5,12 @@
 #include "MyDB_Stats.h"
 #include "MyDB_TableReaderWriter.h"
 #include "ExprTree.h"
-
+#include "Aggregate.h"
+#include "RegularSelection.h"
+#include "ScanJoin.h"
+#include "BPlusSelection.h"
+#include "SortMergeJoin.h"
+#include "ExprTree.h" 
 
 // create a smart pointer for database tables
 using namespace std;
