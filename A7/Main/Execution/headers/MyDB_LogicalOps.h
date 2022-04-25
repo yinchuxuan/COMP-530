@@ -4,18 +4,13 @@
 
 #include "MyDB_Stats.h"
 #include "MyDB_TableReaderWriter.h"
-#include "ExprTree.h"
-#include "Aggregate.h"
-#include "RegularSelection.h"
-#include "ScanJoin.h"
-#include "BPlusSelection.h"
-#include "SortMergeJoin.h"
-#include "ExprTree.h" 
 
 // create a smart pointer for database tables
 using namespace std;
 class LogicalOp;
 typedef shared_ptr <LogicalOp> LogicalOpPtr;
+
+vector<string> exprsToStrings(vector<ExprTreePtr>& expressions, bool isRenaming); 
 
 // this is a pure virtual class that corresponds to a particular relational operation to be run
 class LogicalOp {
@@ -158,6 +153,25 @@ private:
 	MyDB_StatsPtr inputStats;
         vector <ExprTreePtr> selectionPred;
 	vector <string> exprsToCompute;
+};
+
+class LogicalTableProjection : public LogicalOp {
+
+public:
+
+	LogicalTableProjection (LogicalOpPtr inputOp, MyDB_TablePtr outputSpec, vector <ExprTreePtr> &exprsToCompute) : inputOp (inputOp), outputSpec (outputSpec),
+		exprsToCompute (exprsToCompute) {}
+
+	// this costs the table scan returning the compute set of statistics for the output
+	pair <double, MyDB_StatsPtr> cost ();
+
+	MyDB_TableReaderWriterPtr execute ();
+
+private:
+
+	LogicalOpPtr inputOp;
+	MyDB_TablePtr outputSpec;
+	vector <ExprTreePtr> exprsToCompute;
 };
 
 #endif

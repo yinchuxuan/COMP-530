@@ -3,24 +3,47 @@
 #define LOG_OP_CC
 
 #include "MyDB_LogicalOps.h"
+#include "Aggregate.h"
+#include "RegularSelection.h"
+#include "ScanJoin.h"
+#include "BPlusSelection.h"
+#include "SortMergeJoin.h"
+#include "ExprTree.h"
 
-vector<string> exprsToStrings(vector<ExprTreePtr>& expressions) {
+vector<string> exprsToStrings(vector<ExprTreePtr>& expressions, bool isRenaming) {
 	vector<string> result;
 	for (auto expression : expressions) {
-		result.push_back(expression->toString());
+		if (isRenaming) {
+			result.push_back(expression->toRenamingString());
+		} else {
+			result.push_back(expression->toString());
+		}
 	}
 	return result;
 }
 
-vector<pair<MyDB_AggType, string>> exprsToAggs(vector<ExprTreePtr>& expressions) {
+void getAggsFromExpr(ExprTreePtr expression, vector<pair<MyDB_AggType, string>>& result) {
+	if (expression->isAvg()) {
+		result.push_back(pair<MyDB_AggType, string>(avg, expression->getChild()->toString()));
+	} else if (expression->isSum()) {
+		result.push_back(pair<MyDB_AggType, string>(sum, expression->getChild()->toString()));
+	} else {
+		if (expression->getChild()) {
+			getAggsFromExpr(expression->getChild(), result);
+		} 
+		if (expression->getLHS()) {
+			getAggsFromExpr(expression->getLHS(), result);
+		} 
+		if (expression->getRHS()) {
+			getAggsFromExpr(expression->getRHS(), result);
+		}
+	}
+}
+
+vector<pair<MyDB_AggType, string>> getAggsFromExprs(vector<ExprTreePtr>& expressions) {
 	vector<pair<MyDB_AggType, string>> result;
 	for (auto expression : expressions) {
-		if (expression->isAvg()) {
-			result.push_back(pair<MyDB_AggType, string>(avg, expression->toString()));
-		}
-		if (expression->isSum()) {
-			result.push_back(pair<MyDB_AggType, string>(cnt, expression->toString()));
-		}
+		getAggsFromExpr(expression, result);	
 	}
 	return result;
 }
@@ -33,27 +56,136 @@ vector<string> projectionsFromTable(MyDB_TablePtr table) {
 	return result;
 }
 
-MyDB_TableReaderWriterPtr makeAggTable(vector<pair<MyDB_AggType, string>> aggsToCompute, vector<string>& groupings) {
-
+void substituteExprInExpr(ExprTreePtr& exprToCompute, string oldExpr, ExprTreePtr newExpr) {
+	ExprTreePtr tmp;
+	if (exprToCompute->toString() == oldExpr) {
+		exprToCompute = newExpr;
+	} else {
+		if (exprToCompute->getChild()) {
+			tmp = exprToCompute->getChild();
+			substituteExprInExpr(tmp, oldExpr, newExpr);
+			exprToCompute->setChild(tmp);
+		} 
+		if (exprToCompute->getLHS()) {
+			tmp = exprToCompute->getLHS();
+			substituteExprInExpr(tmp, oldExpr, newExpr);
+			exprToCompute->setLHS(tmp);
+		}
+		if (exprToCompute->getRHS()) {
+			tmp = exprToCompute->getRHS();
+			substituteExprInExpr(tmp, oldExpr, newExpr);
+			exprToCompute->setRHS(tmp);
+		}
+	}
 }
 
-vector<pair<string, string>> makeEqualityChecks(vector<ExprTreePtr>& expressions) {
+void substituteExprInExprs(vector<ExprTreePtr>& exprsToCompute, string oldExpr, ExprTreePtr newExpr) {
+	for (auto& expression : exprsToCompute) {
+		substituteExprInExpr(expression, oldExpr, newExpr);	
+	}
+}
+
+MyDB_AttTypePtr getExprType(string expr, MyDB_SchemaPtr tableSchema) {
+	MyDB_Record myRec(tableSchema);
+	return myRec.getType(expr);
+}
+
+MyDB_TableReaderWriterPtr makeAggTable(vector<pair<MyDB_AggType, string>> aggsToCompute, vector<string>& groupings, MyDB_TableReaderWriterPtr inputTable) {
+	MyDB_SchemaPtr aggTableSchema = make_shared<MyDB_Schema>();
+	MyDB_SchemaPtr inputTableSchema = inputTable->getTable()->getSchema();
+	int aggregate_index = 0;
+	int grouping_index = 0;
+
+	for (auto grouping : groupings) {
+		aggTableSchema->getAtts().push_back(make_pair("group" + to_string(grouping_index++), getExprType(grouping, inputTableSchema)));
+	}
+	for (auto aggAtt : aggsToCompute) {
+		aggTableSchema->getAtts().push_back(make_pair("agg" + to_string(aggregate_index++), getExprType(aggAtt.second, inputTableSchema)));
+	}
+
+	MyDB_TablePtr aggTable = make_shared<MyDB_Table>("aggTable", "aggTableStorageLoc", aggTableSchema);
+	return make_shared<MyDB_TableReaderWriter>(aggTable, inputTable->getBufferMgr());
+}
+
+void substituteAggsInProjections(vector<ExprTreePtr>& exprsToCompute, vector<pair<MyDB_AggType, string>> aggsToCompute, MyDB_SchemaPtr aggOutSchema, int groupsNumber) {
+	for (int i = 0; i < aggsToCompute.size(); i++) {
+		string aggString;
+		if (aggsToCompute[i].first == avg) {
+			aggString = "avg(" + aggsToCompute[i].second + ")";
+		} else {
+			aggString = "sum(" + aggsToCompute[i].second + ")";
+		}
+		substituteExprInExprs(exprsToCompute, aggString, make_shared<Identifier>("agg", aggOutSchema->getAtts()[i + groupsNumber].first.c_str()));
+	} 
+}
+
+void substituteGroupsInProjections(vector<ExprTreePtr>& exprsToCompute, vector<string> groupings, MyDB_SchemaPtr aggOutSchema) {
+	for (int i = 0; i < groupings.size(); i++) {
+		substituteExprInExprs(exprsToCompute, groupings[i], make_shared<Identifier>("group", aggOutSchema->getAtts()[i].first.c_str()));
+	} 
+}
+
+bool isAttInTable(ExprTreePtr expression, MyDB_SchemaPtr tableSchema, bool isRenaming) {
+	string exprString;
+	for (auto att : tableSchema->getAtts()) {
+		if (isRenaming) {
+			exprString = expression->toRenamingString();
+		} else {
+			exprString = expression->toString(); 
+		}
+
+		if (exprString == ("[" + att.first + "]")) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+vector<pair<string, string>> makeEqualityChecks(vector<ExprTreePtr>& expressions, bool isRenaming, MyDB_SchemaPtr leftSchema, MyDB_SchemaPtr rightSchema) {
 	vector<pair<string, string>> result;
 	for (auto expression : expressions) {
 		if (expression->isEq()) {
-			result.push_back(pair<string, string>(expression->getLHS()->toString(), expression->getRHS()->toString()));
+			ExprTreePtr lhs = expression->getLHS();
+			ExprTreePtr rhs = expression->getRHS();
+			bool isEqualityCheck = false;
+
+			if (isAttInTable(lhs, leftSchema, isRenaming) && isAttInTable(rhs, rightSchema, isRenaming)) {
+				isEqualityCheck = true;	
+			} else if (isAttInTable(lhs, rightSchema, isRenaming) && isAttInTable(rhs, leftSchema, isRenaming)) {
+				isEqualityCheck = true;
+				swap(lhs, rhs);
+			}
+
+			if (isEqualityCheck) {
+				if (isRenaming) {
+					result.push_back(pair<string, string>(lhs->toRenamingString(), rhs->toRenamingString()));
+				} else {
+					result.push_back(pair<string, string>(lhs->toString(), rhs->toString()));
+				}
+			}
 		}
 	}
 	return result;
 }
 
-string makeSelectionPredicate(vector<ExprTreePtr>& expressions) {
+string makeSelectionPredicate(vector<ExprTreePtr>& expressions, bool isRenaming) {
 	string result = "";
-	if (expressions.size() > 0) {
-		result = expressions[0]->toString();
+	if (expressions.size() == 0) {
+		return "bool[true]";
+	}
 
-		for (int i = 1; i < expressions.size(); i++) {
-			result = "&& ( " + result + ", " + expressions[i].toString() + ")";
+	if (isRenaming) {
+		result = expressions[0]->toRenamingString();
+	} else {
+		result = expressions[0]->toString();
+	}
+
+	for (int i = 1; i < expressions.size(); i++) {
+		if (isRenaming) {
+			result = "&& ( " + result + ", " + expressions[i]->toRenamingString() + ")";
+		} else {
+			result = "&& ( " + result + ", " + expressions[i]->toString() + ")";
 		}
 	}
 	
@@ -63,6 +195,10 @@ string makeSelectionPredicate(vector<ExprTreePtr>& expressions) {
 bool isTableFitInBuffer(MyDB_TableReaderWriterPtr table) {
 	MyDB_BufferManagerPtr bufferManager = table->getBufferMgr();
 	return table->getNumPages() < bufferManager->getPageSize() / 2;
+}
+
+bool isUsingBPlusTree(MyDB_TableReaderWriterPtr table) {
+	return true;
 }
 
 void getSmallAndLargeTable(MyDB_TableReaderWriterPtr leftTable, MyDB_TableReaderWriterPtr rightTable, MyDB_TableReaderWriterPtr& smallTable, MyDB_TableReaderWriterPtr& largeTable) {
@@ -90,14 +226,30 @@ void killTable(MyDB_TableReaderWriterPtr table) {
 MyDB_TableReaderWriterPtr LogicalAggregate :: execute () {
 	MyDB_TableReaderWriterPtr inputTable = inputOp->execute();
 	MyDB_TableReaderWriterPtr outputTable = make_shared<MyDB_TableReaderWriter>(outputSpec, inputTable->getBufferMgr());
-	vector<string> groupingStrings = exprsToStrings(groupings);
-	vector<pair<MyDB_AggType, string>> aggsToCompute = exprsToAggs(exprsToCompute);
-	vector<string> projections = projectionsFromTable(outputSpec); 
-	MyDB_TableReaderWriterPtr aggOutputTable;
+	vector<string> groupingStrings = exprsToStrings(groupings, false);
+	vector<pair<MyDB_AggType, string>> aggsToCompute = getAggsFromExprs(exprsToCompute);
+	MyDB_TableReaderWriterPtr aggOutputTable = makeAggTable(aggsToCompute, groupingStrings, inputTable);
+	substituteAggsInProjections(exprsToCompute, aggsToCompute, aggOutputTable->getTable()->getSchema(), groupings.size());
+	substituteGroupsInProjections(exprsToCompute, groupingStrings, aggOutputTable->getTable()->getSchema());
+	vector<string> projections = exprsToStrings(exprsToCompute, true); 
 
-	Aggregate aggregateOp(inputTable, aggOutputTable, aggsToCompute, groupings, "bool[true]");
+	cout << "start aggregate!" << endl;
+	for (auto a : aggsToCompute) {
+		cout << "aggs to compute:" << a.second << endl;
+	}
+	for (auto a : groupingStrings) {
+		cout << "grouping:" << a << endl;
+	}
+	for (auto b : projections) {
+		cout << "projection:" << b << endl;
+	}
+	cout << "input schema:" << inputTable->getTable()->getSchema() << endl;
+	cout << "output schema:" << outputTable->getTable()->getSchema() << endl;
+	cout << "aggout schema:" << aggOutputTable->getTable()->getSchema() << endl;
+
+	Aggregate aggregateOp(inputTable, aggOutputTable, aggsToCompute, groupingStrings, "bool[true]");
 	aggregateOp.run();
-	RegularSelection regularSelectionOp(aggOutputTable, outputTable, "bool[ture]", projections);
+	RegularSelection regularSelectionOp(aggOutputTable, outputTable, "bool[true]", projections);
 	regularSelectionOp.run();
 
 	killTable(inputTable);
@@ -128,18 +280,30 @@ MyDB_TableReaderWriterPtr LogicalJoin :: execute () {
 	MyDB_TableReaderWriterPtr leftTable = leftInputOp->execute();
 	MyDB_TableReaderWriterPtr rightTable = rightInputOp->execute();
 	MyDB_TableReaderWriterPtr outputTable = make_shared<MyDB_TableReaderWriter>(outputSpec, leftTable->getBufferMgr());
-	vector<string> projections = exprsToStrings(exprsToCompute);
-	vector<pair<string, string>> equalityChecks = makeEqualityChecks(outputSelectionPredicate);
-	string finalSelectionPredicate = makeSelectionPredicate(outputSelectionPredicate);
+	vector<string> projections = exprsToStrings(exprsToCompute, false);
+	vector<pair<string, string>> equalityChecks = makeEqualityChecks(outputSelectionPredicate, false, leftTable->getTable()->getSchema(), rightTable->getTable()->getSchema());
+	string finalSelectionPredicate = makeSelectionPredicate(outputSelectionPredicate, false);
 	MyDB_TableReaderWriterPtr smallTable;
 	MyDB_TableReaderWriterPtr largeTable;
+	cout << "start join!" << endl;
+	cout << "left schema: " << leftTable->getTable()->getSchema() << endl;
+	cout << "right schema: " << rightTable->getTable()->getSchema() << endl;
+	cout << "output schema: " << outputTable->getTable()->getSchema() << endl; 
+	for (auto e : equalityChecks) {
+		cout << "equality check:" << e.first << "=" << e.second << endl;
+	}
+	for (auto p : projections) {
+		cout << "projection: " << p << endl;
+	}
+
+	cout << "final predicate:" << finalSelectionPredicate << endl;
 
 	getSmallAndLargeTable(leftTable, rightTable, smallTable, largeTable);
 	if (isTableFitInBuffer(smallTable)) {		// run scan join
-		ScanJoin scanJoinOp(smallTable, largeTable, outputTable, finalSelectionPredicate, projections, equalityChecks, "bool[true]", "bool[true]");
+		ScanJoin scanJoinOp(leftTable, rightTable, outputTable, finalSelectionPredicate, projections, equalityChecks, "bool[true]", "bool[true]");
 		scanJoinOp.run();
 	} else {		// run sort merge join
-		SortMergeJoin sortMergeJoinOp(smallTable, largeTable, outputTable, finalSelectionPredicate, projections, equalityChecks[0], "bool[true]", "bool[true]");
+		SortMergeJoin sortMergeJoinOp(leftTable, rightTable, outputTable, finalSelectionPredicate, projections, equalityChecks[0], "bool[true]", "bool[true]");
 		sortMergeJoinOp.run();
 	}
 
@@ -160,8 +324,45 @@ pair <double, MyDB_StatsPtr> LogicalTableScan :: cost () {
 // and the selection predicate is handled at the level of the parent (by filtering, for example, the data that is
 // input into a join)
 MyDB_TableReaderWriterPtr LogicalTableScan :: execute () {
+	cout << "start scan!" << endl;
 
-	return nullptr;
+	MyDB_TableReaderWriterPtr outputTable = make_shared<MyDB_TableReaderWriter>(outputSpec, inputSpec->getBufferMgr());
+	string selectionPredicate = makeSelectionPredicate(selectionPred, true);
+
+	cout << "input schema: " << inputSpec->getTable()->getSchema() << endl;
+	cout << "output schema: " << outputSpec->getSchema() << endl;
+	cout << "selection predicate: " << selectionPredicate << endl;
+	for (auto e : exprsToCompute) {
+		cout << "expressions to compute: " << e << endl;
+	}
+
+	RegularSelection regularSelectionOp(inputSpec, outputTable, selectionPredicate, exprsToCompute);
+	regularSelectionOp.run();
+
+	return outputTable;
+}
+
+// this costs the table scan returning the compute set of statistics for the output
+pair <double, MyDB_StatsPtr> LogicalTableProjection :: cost () {
+	return inputOp->cost();	
+}
+
+MyDB_TableReaderWriterPtr LogicalTableProjection :: execute () {
+	MyDB_TableReaderWriterPtr inputTable = inputOp->execute();
+	MyDB_TableReaderWriterPtr outputTable = make_shared<MyDB_TableReaderWriter>(outputSpec, inputTable->getBufferMgr());
+	vector<string> projections = exprsToStrings(exprsToCompute, false);
+
+	cout << "start projection!" << endl;
+	cout << "input schema: " << inputTable->getTable()->getSchema() << endl;
+	cout << "output schema: " << outputSpec->getSchema() << endl;
+	for (auto e : projections) {
+		cout << "expressions to compute: " << e << endl;
+	}
+
+	RegularSelection regularSelectionOp(inputTable, outputTable, "bool[true]", projections);
+	regularSelectionOp.run();
+
+	return outputTable;
 }
 
 #endif

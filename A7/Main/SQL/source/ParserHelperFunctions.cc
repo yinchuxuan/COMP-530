@@ -5,7 +5,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include "ExprTree.h"
-#include "../source/Parser.h"
+#include "Parser.h"
 #include "ParserHelperFunctions.h"
 #include "ParserTypes.h"
 #include <string>

@@ -201,7 +201,6 @@ void Aggregate :: run () {
 	// loop through all of the aggregate records
 	MyDB_RecordPtr outRec = output->getEmptyRecord ();
 	while (myIterAgain->advance ()) {
-
 		myIterAgain->getCurrent (aggRec);
 
 		// set the grouping atts

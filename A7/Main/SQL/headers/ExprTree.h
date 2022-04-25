@@ -20,6 +20,7 @@ public:
 
 	// here are a bunch of self-explanatory operations that allow manipulation of expressions
 	virtual string toString () = 0;
+	virtual string toRenamingString() = 0;
 	virtual ~ExprTree () {}
 	virtual bool isEq () {return false;}
 	virtual bool isId () {return false;}
@@ -33,6 +34,9 @@ public:
 	virtual ExprTreePtr getLHS () {return nullptr;}
 	virtual ExprTreePtr getRHS () {return nullptr;}
 	virtual ExprTreePtr getChild () {return nullptr;}
+	virtual void setLHS (ExprTreePtr expr) {}
+	virtual void setRHS (ExprTreePtr expr) {}
+	virtual void setChild (ExprTreePtr expr) {}
 	virtual bool referencesTable (string alias) {return false;}
 	virtual bool referencesAtt (string alias, string attName) {return false;}
 	virtual bool hasAgg () {
@@ -69,6 +73,10 @@ public:
 			return "bool[false]";
 		}
 	}	
+
+	string toRenamingString () {
+		return toString();	
+	}
 };
 
 class DoubleLiteral : public ExprTree {
@@ -84,6 +92,10 @@ public:
 	string toString () {
 		return "double[" + to_string (myVal) + "]";
 	}	
+
+	string toRenamingString () {
+		return toString();	
+	}
 
 	~DoubleLiteral () {}
 };
@@ -101,6 +113,10 @@ public:
 
 	string toString () {
 		return "int[" + to_string (myVal) + "]";
+	}
+
+	string toRenamingString () {
+		return toString();	
 	}
 
 	~IntLiteral () {}
@@ -121,6 +137,10 @@ public:
 		return "string[" + myVal + "]";
 	}
 
+	string toRenamingString () {
+		return toString();	
+	}
+
 	~StringLiteral () {}
 };
 
@@ -131,14 +151,18 @@ private:
 	string attName;
 public:
 
-	Identifier (char *tableNameIn, char *attNameIn) {
-		tableName = string (tableNameIn);
-		attName = string (attNameIn);
+	Identifier (string tableNameIn, string attNameIn) {
+		tableName = tableNameIn;
+		attName = attNameIn;
 	}
 
 	string toString () {
 		return "[" + tableName + "_" + attName + "]";
 	}	
+
+	string toRenamingString () {
+		return "[" + attName + "]";	
+	}
 
 	string getId () {
 		return tableName + "_" + attName;
@@ -177,6 +201,10 @@ public:
 		return "- (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	string toRenamingString () {
+		return "- (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
+
 	string getId () {
 		string res = lhs->getId ();
 		if (res != "")
@@ -191,6 +219,14 @@ public:
 
 	ExprTreePtr getRHS () {
 		return rhs;
+	}
+
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
 	}
 
 	bool referencesTable (string alias) {
@@ -234,9 +270,21 @@ public:
 		return rhs;
 	}
 
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
+	}
+
 	string toString () {
 		return "+ (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
+
+	string toRenamingString () {
+		return "+ (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
 
 	bool referencesTable (string alias) {
 		return lhs->referencesTable (alias) || rhs->referencesTable (alias);
@@ -279,9 +327,21 @@ public:
 		return rhs;
 	}
 
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
+	}
+
 	string toString () {
 		return "* (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
+
+	string toRenamingString () {
+		return "* (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
 
 	bool referencesTable (string alias) {
 		return lhs->referencesTable (alias) || rhs->referencesTable (alias);
@@ -312,6 +372,10 @@ public:
 		return "/ (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	string toRenamingString () {
+		return "/ (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
+
 	string getId () {
 		string res = lhs->getId ();
 		if (res != "")
@@ -326,6 +390,14 @@ public:
 
 	ExprTreePtr getRHS () {
 		return rhs;
+	}
+
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
 	}
 
 	bool referencesTable (string alias) {
@@ -357,6 +429,10 @@ public:
 		return "> (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	string toRenamingString () {
+		return "> (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
+
 	bool isLTGT () {
 		return true;
 	}
@@ -379,6 +455,14 @@ public:
 
 	ExprTreePtr getRHS () {
 		return rhs;
+	}
+
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
 	}
 
 	bool referencesTable (string alias) {
@@ -410,6 +494,10 @@ public:
 		return "< (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	string toRenamingString () {
+		return "< (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
+
 	bool isLTGT () {
 		return true;
 	}
@@ -432,6 +520,14 @@ public:
 
 	ExprTreePtr getRHS () {
 		return rhs;
+	}
+
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
 	}
 
 	bool referencesTable (string alias) {
@@ -483,9 +579,21 @@ public:
 		return rhs;
 	}
 
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
+	}
+
 	string toString () {
 		return "!= (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
+
+	string toRenamingString () {
+		return "!= (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
 
 	~NeqOp () {}
 };
@@ -508,6 +616,10 @@ public:
 		return "|| (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	string toRenamingString () {
+		return "|| (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
+
 	bool isOr () {
 		return true;
 	}
@@ -526,6 +638,14 @@ public:
 
 	ExprTreePtr getRHS () {
 		return rhs;
+	}
+
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
 	}
 
 	bool referencesTable (string alias) {
@@ -577,9 +697,21 @@ public:
 		return rhs;
 	}
 
+	void setLHS(ExprTreePtr expr) {
+		lhs = expr;
+	}
+	
+	void setRHS(ExprTreePtr expr) {
+		rhs = expr;
+	}
+
 	string toString () {
 		return "== (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
+
+	string toRenamingString () {
+		return "== (" + lhs->toRenamingString () + ", " + rhs->toRenamingString () + ")";
+	}
 
 	bool referencesTable (string alias) {
 		return lhs->referencesTable (alias) || rhs->referencesTable (alias);
@@ -612,6 +744,10 @@ public:
 		return child;
 	}
 
+	void setChild(ExprTreePtr expr) {
+		child = expr;	
+	}
+
 	string getId () {
 		return child->getId ();
 	}
@@ -619,6 +755,10 @@ public:
 	string toString () {
 		return "!(" + child->toString () + ")";
 	}	
+
+	string toRenamingString () {
+		return "!(" + child->toRenamingString () + ")";
+	}
 
 	bool referencesTable (string alias) {
 		return child->referencesTable (alias);
@@ -643,9 +783,17 @@ public:
 		child = childIn;
 	}
 
+	ExprTreePtr getChild() {
+		return child;
+	}
+
 	string toString () {
 		return "sum(" + child->toString () + ")";
 	}	
+
+	string toRenamingString () {
+		return "sum(" + child->toRenamingString () + ")";
+	}
 
 	bool isSum () {
 		return true;
@@ -675,9 +823,17 @@ public:
 		child = childIn;
 	}
 
+	ExprTreePtr getChild() {
+		return child;
+	}
+
 	string toString () {
 		return "avg(" + child->toString () + ")";
 	}	
+
+	string toRenamingString () {
+		return "avg(" + child->toRenamingString () + ")";
+	}
 
 	bool isAvg () {
 		return true;

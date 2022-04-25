@@ -16,6 +16,16 @@ private:
 	vector <ExprTreePtr> allDisjunctions;
 	vector <ExprTreePtr> groupingClauses;
 
+	bool areAggs();
+
+	void sortTablesBySize(map<string, MyDB_TableReaderWriterPtr>& allTableReaderWriters);
+
+	LogicalOpPtr buildSingleScanOp(pair<string, string> tableToProcess, map <string, MyDB_TablePtr> &allTables, map <string, MyDB_TableReaderWriterPtr> &allTableReaderWriters, MyDB_SchemaPtr selectSchema, vector<ExprTreePtr>& remainingDisjunctions);
+
+	LogicalOpPtr buildSingleJoinOp(LogicalOpPtr joinLHS, LogicalOpPtr joinRHS, MyDB_SchemaPtr leftSchema, MyDB_SchemaPtr rightSchema, vector<pair<string, string>> tablesHaveProcessed, MyDB_SchemaPtr opSchema, vector<ExprTreePtr>& remainingDisjunctions);
+
+	LogicalOpPtr buildLeftDeepJoinOpTree(map <string, MyDB_TablePtr> &allTables, map <string, MyDB_TableReaderWriterPtr> &allTableReaderWriters, MyDB_SchemaPtr selectSchema);
+
 public:
 	SFWQuery () {}
 

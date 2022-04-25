@@ -1,0 +1,5 @@
+LOAD part FROM part.tbl;
+LOAD partsupp FROM partsupp.tbl;
+LOAD supplier FROM supplier.tbl;
+LOAD nation FROM nation.tbl;
+LOAD region FROM region.tbl;
