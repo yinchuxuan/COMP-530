@@ -17,3 +17,4 @@ where
 	and (not l2.l_suppkey = l1.l_suppkey)
 group by
 	s.s_name;
+

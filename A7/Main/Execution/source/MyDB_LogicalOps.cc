@@ -232,7 +232,7 @@ MyDB_TableReaderWriterPtr LogicalAggregate :: execute () {
 	substituteAggsInProjections(exprsToCompute, aggsToCompute, aggOutputTable->getTable()->getSchema(), groupings.size());
 	substituteGroupsInProjections(exprsToCompute, groupingStrings, aggOutputTable->getTable()->getSchema());
 	vector<string> projections = exprsToStrings(exprsToCompute, true); 
-
+/*
 	cout << "start aggregate!" << endl;
 	for (auto a : aggsToCompute) {
 		cout << "aggs to compute:" << a.second << endl;
@@ -246,7 +246,7 @@ MyDB_TableReaderWriterPtr LogicalAggregate :: execute () {
 	cout << "input schema:" << inputTable->getTable()->getSchema() << endl;
 	cout << "output schema:" << outputTable->getTable()->getSchema() << endl;
 	cout << "aggout schema:" << aggOutputTable->getTable()->getSchema() << endl;
-
+*/
 	Aggregate aggregateOp(inputTable, aggOutputTable, aggsToCompute, groupingStrings, "bool[true]");
 	aggregateOp.run();
 	RegularSelection regularSelectionOp(aggOutputTable, outputTable, "bool[true]", projections);
@@ -285,6 +285,7 @@ MyDB_TableReaderWriterPtr LogicalJoin :: execute () {
 	string finalSelectionPredicate = makeSelectionPredicate(outputSelectionPredicate, false);
 	MyDB_TableReaderWriterPtr smallTable;
 	MyDB_TableReaderWriterPtr largeTable;
+/*
 	cout << "start join!" << endl;
 	cout << "left schema: " << leftTable->getTable()->getSchema() << endl;
 	cout << "right schema: " << rightTable->getTable()->getSchema() << endl;
@@ -297,7 +298,7 @@ MyDB_TableReaderWriterPtr LogicalJoin :: execute () {
 	}
 
 	cout << "final predicate:" << finalSelectionPredicate << endl;
-
+*/
 	getSmallAndLargeTable(leftTable, rightTable, smallTable, largeTable);
 	if (isTableFitInBuffer(smallTable)) {		// run scan join
 		ScanJoin scanJoinOp(leftTable, rightTable, outputTable, finalSelectionPredicate, projections, equalityChecks, "bool[true]", "bool[true]");
@@ -324,18 +325,17 @@ pair <double, MyDB_StatsPtr> LogicalTableScan :: cost () {
 // and the selection predicate is handled at the level of the parent (by filtering, for example, the data that is
 // input into a join)
 MyDB_TableReaderWriterPtr LogicalTableScan :: execute () {
-	cout << "start scan!" << endl;
-
 	MyDB_TableReaderWriterPtr outputTable = make_shared<MyDB_TableReaderWriter>(outputSpec, inputSpec->getBufferMgr());
 	string selectionPredicate = makeSelectionPredicate(selectionPred, true);
-
+/*
+	cout << "start scan!" << endl;
 	cout << "input schema: " << inputSpec->getTable()->getSchema() << endl;
 	cout << "output schema: " << outputSpec->getSchema() << endl;
 	cout << "selection predicate: " << selectionPredicate << endl;
 	for (auto e : exprsToCompute) {
 		cout << "expressions to compute: " << e << endl;
 	}
-
+*/
 	RegularSelection regularSelectionOp(inputSpec, outputTable, selectionPredicate, exprsToCompute);
 	regularSelectionOp.run();
 
@@ -351,17 +351,18 @@ MyDB_TableReaderWriterPtr LogicalTableProjection :: execute () {
 	MyDB_TableReaderWriterPtr inputTable = inputOp->execute();
 	MyDB_TableReaderWriterPtr outputTable = make_shared<MyDB_TableReaderWriter>(outputSpec, inputTable->getBufferMgr());
 	vector<string> projections = exprsToStrings(exprsToCompute, false);
-
+/*
 	cout << "start projection!" << endl;
 	cout << "input schema: " << inputTable->getTable()->getSchema() << endl;
 	cout << "output schema: " << outputSpec->getSchema() << endl;
 	for (auto e : projections) {
 		cout << "expressions to compute: " << e << endl;
 	}
-
+*/
 	RegularSelection regularSelectionOp(inputTable, outputTable, "bool[true]", projections);
 	regularSelectionOp.run();
 
+	killTable(inputTable);
 	return outputTable;
 }
 

@@ -58,7 +58,7 @@ MyDB_StatsPtr MyDB_Stats :: costSelection (vector <ExprTreePtr> &allDisjunctions
 		myActualExpr = myExpr;
 	}
 
-	cout << "expession is: " << myActualExpr->toString () << "\n";
+	//cout << "expession is: " << myActualExpr->toString () << "\n";
 
 	// just verify that it's a comparison
 	if (!myActualExpr->isComp ())
@@ -138,12 +138,12 @@ MyDB_StatsPtr MyDB_Stats :: costSelection (vector <ExprTreePtr> &allDisjunctions
 		temp->allAtts = allAtts;
 	}
 	
-	cout << "in tuples was " << tupleCount << " and out is " << temp->tupleCount << "\n";
+	//cout << "in tuples was " << tupleCount << " and out is " << temp->tupleCount << "\n";
 
 	auto res = temp->costSelection (allDisjunctions);
 	allDisjunctions.push_back (myExpr);
-	cout << "output stats are ";
-	res->print ();
+	//cout << "output stats are ";
+	//res->print ();
 	return res;
 
 	
@@ -152,8 +152,8 @@ MyDB_StatsPtr MyDB_Stats :: costSelection (vector <ExprTreePtr> &allDisjunctions
 
 MyDB_StatsPtr MyDB_Stats ::  costJoin (vector <ExprTreePtr> &allDisjunctions, MyDB_StatsPtr RHS) {
 
-	this->print ();
-	RHS->print ();
+	//this->print ();
+	//RHS->print ();
 
 	// search through the clauses to find an equality check
 	int pos = 0;
@@ -162,8 +162,8 @@ MyDB_StatsPtr MyDB_Stats ::  costJoin (vector <ExprTreePtr> &allDisjunctions, My
 		if (a->isEq ()) {
 			// we found an equals! check that each side comes from a different table
 			if (a->getLHS ()->isId () && a->getRHS ()->isId ()) {
-			 	cout << a->getLHS ()->getId () << "\n";
-			 	cout << a->getRHS ()->getId () << "\n";
+			 	//cout << a->getLHS ()->getId () << "\n";
+			 	//cout << a->getRHS ()->getId () << "\n";
 				auto lhsAttCnt = getAttVals (a->getLHS ()->getId ());
 				auto lhsTupleCnt = getTupleCount ();
 				auto rhsAttCnt = RHS->getAttVals (a->getRHS ()->getId ());
@@ -180,7 +180,7 @@ MyDB_StatsPtr MyDB_Stats ::  costJoin (vector <ExprTreePtr> &allDisjunctions, My
 				if (lhsAttCnt < 0.00000001)
 					cout << "Bad error!!  I could not find att val " << a->getLHS ()->getId () << " during costing.\n";
 				
-				cout << "att counts were " << lhsAttCnt << ", " << rhsAttCnt << "\n";
+				//cout << "att counts were " << lhsAttCnt << ", " << rhsAttCnt << "\n";
 
 				// see if we were able to get a join predicate
 				if (lhsAttCnt > 0 && rhsAttCnt > 0) {
@@ -195,7 +195,7 @@ MyDB_StatsPtr MyDB_Stats ::  costJoin (vector <ExprTreePtr> &allDisjunctions, My
 					// and so now we create a new set of stats
 					for (auto &b: allAtts) {
 						pair <double, string> newOne;
-						cout << "[" << a->getLHS ()->getId () << " " << a->getRHS ()->getId () << "] ";
+						//cout << "[" << a->getLHS ()->getId () << " " << a->getRHS ()->getId () << "] ";
 						if (b.second == a->getLHS ()->getId () || b.second == a->getRHS ()->getId ()) {
 							newOne.first = minAttCnt;
 						} else {
@@ -204,26 +204,26 @@ MyDB_StatsPtr MyDB_Stats ::  costJoin (vector <ExprTreePtr> &allDisjunctions, My
 								newOne.first = temp->tupleCount;
 						}
 						newOne.second = b.second;
-						cout << "(" << newOne.first << ", " << newOne.second << ") ";
+						//cout << "(" << newOne.first << ", " << newOne.second << ") ";
 						temp->allAtts.push_back (newOne);	
 					}	
 					for (auto &b: RHS->allAtts) {
 						pair <double, string> newOne;
-						cout << "[" << a->getLHS ()->getId () << " " << a->getRHS ()->getId () << "] ";
+						//cout << "[" << a->getLHS ()->getId () << " " << a->getRHS ()->getId () << "] ";
 						if (b.second == a->getLHS ()->getId () || b.second == a->getRHS ()->getId ()) {
 							newOne.first = minAttCnt;
-							cout << "! ";
+							//cout << "! ";
 						} else {
 							newOne.first = b.first;
 							if (newOne.first > temp->tupleCount)
 								newOne.first = temp->tupleCount;
 						}
 						newOne.second = b.second;
-						cout << "(" << newOne.first << ", " << newOne.second << ") ";
+						//cout << "(" << newOne.first << ", " << newOne.second << ") ";
 						temp->allAtts.push_back (newOne);	
 					}	
 
-					cout << "\n";
+					//cout << "\n";
 				}
 			}
 

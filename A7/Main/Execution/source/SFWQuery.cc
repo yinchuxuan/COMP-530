@@ -3,11 +3,13 @@
 #define SFW_QUERY_CC
 
 #include "ParserTypes.h"
+#include "TableSetPartition.h"
 #include <algorithm>
+#include <cfloat>
 
-bool isTableInTableSet(string tableName, vector<pair<string, string>>& tableSet) {
+bool isTableInTableSet(string alias, vector<pair<string, string>>& tableSet) {
 	for (auto table : tableSet) {
-		if (tableName == table.first) {
+		if (alias == table.second) {
 			return true;
 		}
 	}
@@ -18,7 +20,7 @@ bool isDisjunctionOnlyRefTableSet(ExprTreePtr disjunction, vector<pair<string, s
 	bool result = true;
 	bool isReferenced = false;
 	for (int i = 0; i < tablesToProcess.size(); i++) {
-		if (isTableInTableSet(tablesToProcess[i].first, tableSet)) {
+		if (isTableInTableSet(tablesToProcess[i].second, tableSet)) {
 			isReferenced = isReferenced || disjunction->referencesTable(tablesToProcess[i].second);
 		} else {
 			result = result && !disjunction->referencesTable(tablesToProcess[i].second);
@@ -87,6 +89,18 @@ vector<string> getExprsToCompute(vector<ExprTreePtr>& valuesToSelect, vector<Exp
 	return result;
 }
 
+vector<ExprTreePtr> getExprsToComputeOfTableSet(vector<ExprTreePtr>& valuesToSelect, vector<ExprTreePtr>& topCNF, vector<pair<string, string>> tableSet, map<string, MyDB_TablePtr> allTables) {
+	vector<ExprTreePtr> result;
+	for (auto table : tableSet) {
+		for (auto att : allTables[table.first]->getSchema()->getAtts()) {
+			if (isAttInValuesToSelect(att, valuesToSelect, table.second) || isAttNeededInCNF(att, topCNF, table.second)) {
+				result.push_back(make_shared<Identifier>(table.second, att.first));
+			}
+		}
+	}
+	return result;
+}
+
 vector<ExprTreePtr> getJoinExprsToCompute(vector<ExprTreePtr>& valuesToSelect, vector<ExprTreePtr>& remainingDisjunctions, MyDB_SchemaPtr leftSchema, MyDB_SchemaPtr rightSchema, vector<pair<string, string>> tableSet) {
 	vector<ExprTreePtr> result;
 	for (auto att : leftSchema->getAtts()) {
@@ -144,10 +158,6 @@ MyDB_SchemaPtr makeJoinSchema(vector<ExprTreePtr>& exprsToCompute, MyDB_SchemaPt
 	for (auto exprToCompute : exprsToCompute) {
 		result->getAtts().push_back(make_pair(exprToCompute->toString().substr(1, exprToCompute->toString().size() - 2), myRec.getType(exprToCompute->toString())));	
 	}
-
-	for (auto exprToCompute : exprsToCompute) {
-		cout << exprToCompute->toString() << endl;
-	}
 	return result;
 }
 
@@ -189,15 +199,8 @@ LogicalOpPtr SFWQuery :: buildSingleScanOp(pair<string, string> tableToProcess, 
 	MyDB_TableReaderWriterPtr inputTable = allTableReaderWriters[tableToProcess.first];
 	vector<pair<string, string>> singleTableSet = vector<pair<string, string>>{ tableToProcess };
 	vector<ExprTreePtr> CNF = getCNFOfTableSet(remainingDisjunctions, singleTableSet, tablesToProcess);
-	for (auto e : CNF) {
-		cout << "CNF:" << e->toRenamingString() << endl;
-	}
 	vector<string> exprsToCompute = getExprsToCompute(valuesToSelect, remainingDisjunctions, inputTable->getTable(), tableToProcess.second);
-	for (auto e : exprsToCompute) {
-		cout << "exprToCompute:" << e << endl;
-	}
 	MyDB_SchemaPtr outputSchema = makeScanSchema(exprsToCompute, inputTable->getTable()->getSchema(), tableToProcess.second);
-	cout << outputSchema << endl;
 	copySchema(outputSchema, opSchema);
 
 	return make_shared <LogicalTableScan> (inputTable, make_shared <MyDB_Table> ("selectTable" + tableToProcess.second, "selectStorageLoc" + tableToProcess.second, outputSchema), 
@@ -212,6 +215,62 @@ LogicalOpPtr SFWQuery :: buildSingleJoinOp(LogicalOpPtr joinLHS, LogicalOpPtr jo
 
 	return make_shared <LogicalJoin> (joinLHS, joinRHS, make_shared <MyDB_Table> ("joinTable" + to_string(tablesHaveProcessed.size()),
 	"joinStorageLoc" + to_string(tablesHaveProcessed.size()), outputSchema), CNF, exprsToCompute);
+}
+
+LogicalOpPtr SFWQuery :: buildScanOp(pair<string, string> table, map<string, MyDB_TablePtr>& allTables, map<string, MyDB_TableReaderWriterPtr>& allTableReaderWriters, vector<ExprTreePtr> exprsToCompute, vector<ExprTreePtr> CNFSet, MyDB_SchemaPtr opSchema) {
+	MyDB_TablePtr inputTable = allTables[table.first];
+	vector<string> exprStrings = exprsToStrings(exprsToCompute, true);
+	MyDB_SchemaPtr outputSchema = makeScanSchema(exprStrings, inputTable->getSchema(), table.second);
+	copySchema(outputSchema, opSchema);
+	return make_shared <LogicalTableScan> (allTableReaderWriters[table.first], make_shared <MyDB_Table> ("selectTable" + table.second, table.second + "StorageLoc", outputSchema), 
+		   make_shared <MyDB_Stats> (inputTable, table.second), CNFSet, exprStrings);
+}
+
+LogicalOpPtr SFWQuery :: buildJoinOp(LogicalOpPtr leftOp, LogicalOpPtr rightOp, MyDB_SchemaPtr leftSchema, MyDB_SchemaPtr rightSchema, vector<ExprTreePtr> exprsToCompute, vector<ExprTreePtr> topCNF, MyDB_SchemaPtr opSchema) {
+	MyDB_SchemaPtr outputSchema = makeJoinSchema(exprsToCompute, leftSchema, rightSchema);
+	copySchema(outputSchema, opSchema);
+
+	return make_shared <LogicalJoin> (leftOp, rightOp, make_shared <MyDB_Table> ("joinTable" + to_string(joinTableCount++), "joinStorageLoc" + to_string(joinTableCount++), outputSchema), topCNF, exprsToCompute);
+}
+
+LogicalOpPtr SFWQuery :: buildJoinFromTwoTableSet(vector<pair<string, string>> leftTables, vector<pair<string, string>> rightTables, map<string, MyDB_TablePtr>& allTables, map<string, MyDB_TableReaderWriterPtr> allTableReaderWriters,
+ 	vector<pair<string, string>> allTableSet, vector<ExprTreePtr> CNFSet, vector<ExprTreePtr> exprsToCompute, MyDB_SchemaPtr opSchema) {
+	vector<ExprTreePtr> leftCNF = getCNFOfTableSet(CNFSet, leftTables, allTableSet);
+	vector<ExprTreePtr> rightCNF = getCNFOfTableSet(CNFSet, rightTables, allTableSet);
+	vector<ExprTreePtr> leftExprsToCompute = getExprsToComputeOfTableSet(exprsToCompute, CNFSet, leftTables, allTables); 
+	vector<ExprTreePtr> rightExprsToCompute = getExprsToComputeOfTableSet(exprsToCompute, CNFSet, rightTables, allTables);
+	MyDB_SchemaPtr leftSchema = make_shared<MyDB_Schema>();
+	MyDB_SchemaPtr rightSchema = make_shared<MyDB_Schema>();
+	LogicalOpPtr leftOp = buildOptimizedOpTree(allTables, allTableReaderWriters, leftCNF, leftTables, leftExprsToCompute, leftSchema); 
+	LogicalOpPtr rightOp = buildOptimizedOpTree(allTables, allTableReaderWriters, rightCNF, rightTables, rightExprsToCompute, rightSchema);
+	return buildJoinOp(leftOp, rightOp, leftSchema, rightSchema, exprsToCompute, CNFSet, opSchema);
+}
+
+LogicalOpPtr SFWQuery :: buildOptimizedOpTree(map<string, MyDB_TablePtr>& allTables, map<string, MyDB_TableReaderWriterPtr>& allTableReaderWriters, vector<ExprTreePtr> CNFSet, vector<pair<string, string>> tableSet, vector<ExprTreePtr> exprsToCompute, MyDB_SchemaPtr opSchema) {
+	LogicalOpPtr result;
+	double bestCost = DBL_MAX;
+
+	if (tableSet.size() == 1) {
+		result = buildScanOp(tableSet[0], allTables, allTableReaderWriters, exprsToCompute, CNFSet, opSchema);
+	} else {
+		TableSetPartition tableSetPartition(tableSet);	// will not get empty set here
+		while (tableSetPartition.hasNext()) {
+			pair<vector<pair<string, string>>, vector<pair<string, string>>> partition = tableSetPartition.getNextPartition();
+			vector<pair<string, string>> leftTables = partition.first;
+			vector<pair<string, string>> rightTables = partition.second;
+
+
+			if (leftTables.size() <= rightTables.size()) {
+				LogicalOpPtr tmpResult = buildJoinFromTwoTableSet(leftTables, rightTables, allTables, allTableReaderWriters, tableSet, CNFSet, exprsToCompute, opSchema);
+				if (tmpResult->cost().first < bestCost) {
+					result = tmpResult;
+					bestCost = tmpResult->cost().first;
+				}
+			}
+		}
+	}
+
+	return result;
 }
 
 LogicalOpPtr SFWQuery :: buildLeftDeepJoinOpTree(map<string, MyDB_TablePtr>& allTables, map<string, MyDB_TableReaderWriterPtr>& allTableReaderWriters, MyDB_SchemaPtr opSchema) {
@@ -243,6 +302,25 @@ LogicalOpPtr SFWQuery :: buildLeftDeepJoinOpTree(map<string, MyDB_TablePtr>& all
 // 
 LogicalOpPtr SFWQuery :: buildLogicalQueryPlan (map <string, MyDB_TablePtr> &allTables, map <string, MyDB_TableReaderWriterPtr> &allTableReaderWriters) {
 	LogicalOpPtr finalProjectionOp;
+	LogicalOpPtr optimizedOpTree;
+	MyDB_SchemaPtr opSchema = make_shared<MyDB_Schema>();
+	MyDB_SchemaPtr outputSchema;
+	vector<ExprTreePtr> emptyTopCNF = vector<ExprTreePtr>{};
+	vector<ExprTreePtr> exprsToCompute = getExprsToComputeOfTableSet(valuesToSelect, emptyTopCNF, tablesToProcess, allTables);
+
+	optimizedOpTree = buildOptimizedOpTree(allTables, allTableReaderWriters, allDisjunctions, tablesToProcess, exprsToCompute, opSchema);	
+	outputSchema = makeOutputSchema(opSchema, valuesToSelect);
+	if (areAggs()) {
+		finalProjectionOp = make_shared<LogicalAggregate>(optimizedOpTree, make_shared <MyDB_Table> ("outputTable", "outputStorageLoc", outputSchema),
+			valuesToSelect, groupingClauses);
+	} else {
+		finalProjectionOp = make_shared <LogicalTableProjection> (optimizedOpTree, 
+			make_shared <MyDB_Table> ("outputTable", "outputStorageLoc", outputSchema), valuesToSelect);
+	}
+
+	return finalProjectionOp;
+/*
+	LogicalOpPtr finalProjectionOp;
 	LogicalOpPtr selectOp;
 	MyDB_SchemaPtr opSchema = make_shared<MyDB_Schema>();
 	MyDB_SchemaPtr outputSchema;
@@ -266,7 +344,7 @@ LogicalOpPtr SFWQuery :: buildLogicalQueryPlan (map <string, MyDB_TablePtr> &all
 	}
 
 	return finalProjectionOp;
-/*
+
 	// first, make sure we have exactly two tables... this prototype only works on two tables!!
 	if (tablesToProcess.size () != 2) {
 		cout << "Sorry, this currently only works for two-table queries!\n";
@@ -414,19 +492,22 @@ SFWQuery :: SFWQuery (struct ValueList *selectClause, struct FromList *fromClaus
         tablesToProcess = fromClause->aliases;
         allDisjunctions = cnf->disjunctions;
         groupingClauses = grouping->valuesToCompute;
+		joinTableCount = 0;
 }
 
 SFWQuery :: SFWQuery (struct ValueList *selectClause, struct FromList *fromClause,
         struct CNF *cnf) {
         valuesToSelect = selectClause->valuesToCompute;
         tablesToProcess = fromClause->aliases;
-	allDisjunctions = cnf->disjunctions;
+		allDisjunctions = cnf->disjunctions;
+		joinTableCount = 0; 
 }
 
 SFWQuery :: SFWQuery (struct ValueList *selectClause, struct FromList *fromClause) {
         valuesToSelect = selectClause->valuesToCompute;
         tablesToProcess = fromClause->aliases;
         allDisjunctions.push_back (make_shared <BoolLiteral> (true));
+		joinTableCount = 0;
 }
 
 #endif

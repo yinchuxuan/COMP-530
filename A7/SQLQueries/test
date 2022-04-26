@@ -2,6 +2,7 @@ select
 	sum (1), 
 	avg ((o.o_totalprice - 32592.14) / 32592.14)
 from
-	orders as o
+	orders as o,
+	region as r 
 where
 	(o.o_orderstatus = "F"); 

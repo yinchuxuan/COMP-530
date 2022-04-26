@@ -15,6 +15,7 @@ private:
 	vector <pair <string, string>> tablesToProcess;
 	vector <ExprTreePtr> allDisjunctions;
 	vector <ExprTreePtr> groupingClauses;
+	int joinTableCount;
 
 	bool areAggs();
 
@@ -24,7 +25,16 @@ private:
 
 	LogicalOpPtr buildSingleJoinOp(LogicalOpPtr joinLHS, LogicalOpPtr joinRHS, MyDB_SchemaPtr leftSchema, MyDB_SchemaPtr rightSchema, vector<pair<string, string>> tablesHaveProcessed, MyDB_SchemaPtr opSchema, vector<ExprTreePtr>& remainingDisjunctions);
 
+	LogicalOpPtr buildScanOp(pair<string, string> table, map<string, MyDB_TablePtr>& allTables, map<string, MyDB_TableReaderWriterPtr>& allTableReaderWriters, vector<ExprTreePtr> exprsToCompute, vector<ExprTreePtr> CNFSet, MyDB_SchemaPtr opSchema);
+
+	LogicalOpPtr buildJoinOp(LogicalOpPtr leftOp, LogicalOpPtr rightOp, MyDB_SchemaPtr leftSchema, MyDB_SchemaPtr rightSchema, vector<ExprTreePtr> exprsToCompute, vector<ExprTreePtr> topCNF, MyDB_SchemaPtr opSchema);
+
 	LogicalOpPtr buildLeftDeepJoinOpTree(map <string, MyDB_TablePtr> &allTables, map <string, MyDB_TableReaderWriterPtr> &allTableReaderWriters, MyDB_SchemaPtr selectSchema);
+
+	LogicalOpPtr buildJoinFromTwoTableSet(vector<pair<string, string>> leftTables, vector<pair<string, string>> rightTables, map<string, MyDB_TablePtr>& allTables, map<string, MyDB_TableReaderWriterPtr> allTableReaderWriters,
+ 	vector<pair<string, string>> allTableSet, vector<ExprTreePtr> CNFSet, vector<ExprTreePtr> exprsToCompute, MyDB_SchemaPtr opSchema);
+
+	LogicalOpPtr buildOptimizedOpTree(map<string, MyDB_TablePtr>& allTables, map<string, MyDB_TableReaderWriterPtr>& allTableReaderWriters, vector<ExprTreePtr> CNFSet, vector<pair<string, string>> tableSet, vector<ExprTreePtr> exprsToCompute, MyDB_SchemaPtr opSchema);
 
 public:
 	SFWQuery () {}

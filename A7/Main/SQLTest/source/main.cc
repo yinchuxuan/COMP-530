@@ -10,6 +10,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iterator>
+#include <ctime>
 
 using namespace std;
 string toLower (string data) {
@@ -161,12 +162,17 @@ int main (int numArgs, char **args) {
 						}	
 
 					} else if (final->isSFWQuery ()) {
+						auto startTime = clock();
+						cout << "build query plan, please wait for a while..." << endl;
 						LogicalOpPtr myPlan = final->buildLogicalQueryPlan (allTables, allTableReaderWriters);
 						if (myPlan != nullptr) {
 							auto res = myPlan->cost ();
 							cout << "cost was " << res.first << "\n";
-
+							
+							cout << "query is processing, please wait for a while..." << endl;
+							auto startTime = clock();
 							MyDB_TableReaderWriterPtr resultTable = myPlan->execute();
+							double duration = (clock() - startTime) /  (double) CLOCKS_PER_SEC;
 							MyDB_RecordIteratorAltPtr iter = resultTable->getIteratorAlt();
 							MyDB_RecordPtr tmp = resultTable->getEmptyRecord();
 							int count = 0;
@@ -179,6 +185,9 @@ int main (int numArgs, char **args) {
 							}
 
 							cout << "number of results: " << count << endl;
+							cout << "time cost: " << duration << "s" << endl;
+						} else {
+							cout << "failed to build query plan!" << endl;
 						}
 					}
 

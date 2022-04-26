@@ -28,3 +28,4 @@ where
 	and (p.p_type = "ECONOMY ANODIZED STEEL")
 group by
 	o.o_orderdate;
+

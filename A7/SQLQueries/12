@@ -2,7 +2,7 @@
 select
 	"both customers purchased part " + p.p_name
 from
-	part p,
+	part as p,
 	orders as o1,
 	orders as o2,
 	lineitem as l1,
